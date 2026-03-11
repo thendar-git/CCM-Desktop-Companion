@@ -3,6 +3,10 @@
 **/obj/
 artifacts/publish/
 
+# Installer artifacts are distributed as GitHub release assets, not tracked in git
+Builds/*.msi
+Builds/*.wixpdb
+
 # WiX generated includes
 Installer/GeneratedComponents.wxi
 Installer/GeneratedComponentRefs.wxi
