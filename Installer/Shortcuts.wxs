@@ -1,0 +1,35 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <DirectoryRef Id="ProgramMenuDir">
+      <Component Id="ProgramMenuShortcutComponent" Guid="4E7CD292-4720-41A1-96BC-95FC96A17CB7">
+        <Shortcut Id="ProgramMenuShortcut"
+                  Name="CCM Desktop Companion"
+                  Description="Launch CCM Desktop Companion"
+                  Target="[INSTALLFOLDER]CCM.DesktopCompanion.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Thendar\CCMDesktopCompanion" Name="ProgramMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcutComponent" Guid="BC69DB75-BE62-4CC8-9D22-640A72FC8E8E">
+        <Shortcut Id="DesktopShortcut"
+                  Name="CCM Desktop Companion"
+                  Description="Launch CCM Desktop Companion"
+                  Target="[INSTALLFOLDER]CCM.DesktopCompanion.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU" Key="Software\Thendar\CCMDesktopCompanion" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ShortcutComponents">
+      <ComponentRef Id="ProgramMenuShortcutComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </ComponentGroup>
+  </Fragment>
+</Wix>

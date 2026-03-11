@@ -1,0 +1,12 @@
+# Build output
+**/bin/
+**/obj/
+artifacts/publish/
+
+# WiX generated includes
+Installer/GeneratedComponents.wxi
+Installer/GeneratedComponentRefs.wxi
+
+# User-local runtime files
+*.user
+*.suo

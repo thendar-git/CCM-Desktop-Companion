@@ -1,0 +1,13 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <DirectoryRef Id="INSTALLFOLDER">
+      <?include GeneratedComponents.wxi?>
+    </DirectoryRef>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="AppFiles">
+      <?include GeneratedComponentRefs.wxi?>
+    </ComponentGroup>
+  </Fragment>
+</Wix>
