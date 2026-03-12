@@ -23,10 +23,10 @@ internal sealed class SummaryForm : Form
     public SummaryForm()
     {
         Text = "CCM Desktop Companion";
-        Width = 1040;
-        Height = 660;
+        Width = 1140;
+        Height = 640;
+        MinimumSize = new Size(1140, 640);
         StartPosition = FormStartPosition.CenterScreen;
-        WindowState = FormWindowState.Maximized;
 
         _summaryLabel = new Label
         {
@@ -363,3 +363,5 @@ internal sealed class SummaryForm : Form
         return $"{hours}h {minutes}m";
     }
 }
+
+

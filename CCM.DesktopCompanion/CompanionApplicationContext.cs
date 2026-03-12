@@ -12,7 +12,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
     private readonly NotifyIcon _notifyIcon;
     private readonly Icon _applicationIcon;
     private SummaryForm? _summaryForm;
-    private FormWindowState _summaryRestoreWindowState = FormWindowState.Maximized;
+    private FormWindowState _summaryRestoreWindowState = FormWindowState.Normal;
     private readonly DesktopSnapshotReader _reader;
     private readonly SavedVariablesWatcher _watcher;
     private readonly RuntimeStateCalculator _runtimeStateCalculator;
@@ -261,3 +261,5 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         selectedValues.RemoveWhere(value => !validValues.Contains(value, StringComparer.OrdinalIgnoreCase));
     }
 }
+
+
