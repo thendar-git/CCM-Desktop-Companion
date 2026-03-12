@@ -26,6 +26,7 @@ internal sealed class SummaryForm : Form
         Width = 1040;
         Height = 660;
         StartPosition = FormStartPosition.CenterScreen;
+        WindowState = FormWindowState.Maximized;
 
         _summaryLabel = new Label
         {

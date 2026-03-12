@@ -10,7 +10,9 @@ namespace CCM.DesktopCompanion;
 internal sealed class CompanionApplicationContext : ApplicationContext
 {
     private readonly NotifyIcon _notifyIcon;
+    private readonly Icon _applicationIcon;
     private SummaryForm? _summaryForm;
+    private FormWindowState _summaryRestoreWindowState = FormWindowState.Maximized;
     private readonly DesktopSnapshotReader _reader;
     private readonly SavedVariablesWatcher _watcher;
     private readonly RuntimeStateCalculator _runtimeStateCalculator;
@@ -29,6 +31,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
             CompanionLog.Write($"Toast activated. Arguments={args.Argument}");
         };
 
+        _applicationIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
         _reader = new DesktopSnapshotReader();
         _runtimeStateCalculator = new RuntimeStateCalculator();
         _notificationService = new NotificationService();
@@ -47,7 +50,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         _notifyIcon = new NotifyIcon
         {
             Text = "CCM",
-            Icon = SystemIcons.Application,
+            Icon = (Icon)_applicationIcon.Clone(),
             Visible = true,
             ContextMenuStrip = contextMenu,
         };
@@ -83,7 +86,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         _runtimeTimer.Tick += (_, _) => ApplyRuntimeStateAndRefreshUi();
         _runtimeTimer.Start();
 
-        RefreshSnapshot();
+        ShowSummary();
     }
 
     protected override void ExitThreadCore()
@@ -99,6 +102,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         {
             _summaryForm.Dispose();
         }
+        _applicationIcon.Dispose();
         base.ExitThreadCore();
     }
 
@@ -109,7 +113,11 @@ internal sealed class CompanionApplicationContext : ApplicationContext
             return;
         }
 
-        var form = new SummaryForm();
+        var form = new SummaryForm
+        {
+            Icon = (Icon)_applicationIcon.Clone(),
+            WindowState = _summaryRestoreWindowState,
+        };
         form.FiltersChanged += (_, _) =>
         {
             PersistFilters();
@@ -135,6 +143,16 @@ internal sealed class CompanionApplicationContext : ApplicationContext
                 form.Hide();
             }
         };
+        form.Resize += (_, _) =>
+        {
+            if (form.WindowState == FormWindowState.Minimized)
+            {
+                form.Hide();
+                return;
+            }
+
+            _summaryRestoreWindowState = form.WindowState;
+        };
 
         _summaryForm = form;
     }
@@ -143,7 +161,11 @@ internal sealed class CompanionApplicationContext : ApplicationContext
     {
         EnsureSummaryForm();
         RefreshSnapshot();
-        _summaryForm!.Show();
+        if (_summaryForm!.WindowState == FormWindowState.Minimized)
+        {
+            _summaryForm.WindowState = _summaryRestoreWindowState;
+        }
+        _summaryForm.Show();
         _summaryForm.BringToFront();
         _summaryForm.Activate();
     }

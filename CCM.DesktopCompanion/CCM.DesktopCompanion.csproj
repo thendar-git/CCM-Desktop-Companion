@@ -15,8 +15,12 @@
     <SelfContained>true</SelfContained>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishDir>$(MSBuildThisFileDirectory)bin\Publish\</PublishDir>
+    <ApplicationIcon>Assets\CCM.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.WinUI.Notifications" Version="7.1.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Assets\CCM.ico" />
   </ItemGroup>
 </Project>
