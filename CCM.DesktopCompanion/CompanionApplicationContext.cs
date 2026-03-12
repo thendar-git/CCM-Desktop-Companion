@@ -10,7 +10,7 @@ namespace CCM.DesktopCompanion;
 internal sealed class CompanionApplicationContext : ApplicationContext
 {
     private readonly NotifyIcon _notifyIcon;
-    private readonly SummaryForm _summaryForm;
+    private SummaryForm? _summaryForm;
     private readonly DesktopSnapshotReader _reader;
     private readonly SavedVariablesWatcher _watcher;
     private readonly RuntimeStateCalculator _runtimeStateCalculator;
@@ -29,7 +29,6 @@ internal sealed class CompanionApplicationContext : ApplicationContext
             CompanionLog.Write($"Toast activated. Arguments={args.Argument}");
         };
 
-        _summaryForm = new SummaryForm();
         _reader = new DesktopSnapshotReader();
         _runtimeStateCalculator = new RuntimeStateCalculator();
         _notificationService = new NotificationService();
@@ -37,23 +36,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         _settingsService = new DesktopSettingsService();
         _settings = _settingsService.Load();
 
-        _summaryForm.FiltersChanged += (_, _) =>
-        {
-            PersistFilters();
-            ApplyRuntimeStateAndRefreshUi();
-        };
-        _summaryForm.NotificationEnabledChanged += (cooldown, enabled) =>
-        {
-            _settings.SetNotificationEnabled(cooldown, enabled);
-            _settingsService.Save(_settings);
-            ApplyRuntimeStateAndRefreshUi();
-        };
-        _summaryForm.SortChanged += (columnName, ascending) =>
-        {
-            _settings.SortColumnName = columnName;
-            _settings.SortAscending = ascending;
-            _settingsService.Save(_settings);
-        };
+        EnsureSummaryForm();
 
         var contextMenu = new ContextMenuStrip();
         contextMenu.Items.Add("Open", null, (_, _) => ShowSummary());
@@ -73,7 +56,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         {
             if (args.Button == MouseButtons.Left)
             {
-                if (_summaryForm.Visible)
+                if (_summaryForm is { IsDisposed: false, Visible: true })
                 {
                     _summaryForm.Hide();
                 }
@@ -112,14 +95,55 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         _runtimeTimer.Dispose();
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
-        _summaryForm.Dispose();
+        if (_summaryForm is { IsDisposed: false })
+        {
+            _summaryForm.Dispose();
+        }
         base.ExitThreadCore();
+    }
+
+    private void EnsureSummaryForm()
+    {
+        if (_summaryForm is { IsDisposed: false })
+        {
+            return;
+        }
+
+        var form = new SummaryForm();
+        form.FiltersChanged += (_, _) =>
+        {
+            PersistFilters();
+            ApplyRuntimeStateAndRefreshUi();
+        };
+        form.NotificationEnabledChanged += (cooldown, enabled) =>
+        {
+            _settings.SetNotificationEnabled(cooldown, enabled);
+            _settingsService.Save(_settings);
+            ApplyRuntimeStateAndRefreshUi();
+        };
+        form.SortChanged += (columnName, ascending) =>
+        {
+            _settings.SortColumnName = columnName;
+            _settings.SortAscending = ascending;
+            _settingsService.Save(_settings);
+        };
+        form.FormClosing += (_, args) =>
+        {
+            if (args.CloseReason == CloseReason.UserClosing)
+            {
+                args.Cancel = true;
+                form.Hide();
+            }
+        };
+
+        _summaryForm = form;
     }
 
     private void ShowSummary()
     {
+        EnsureSummaryForm();
         RefreshSnapshot();
-        _summaryForm.Show();
+        _summaryForm!.Show();
         _summaryForm.BringToFront();
         _summaryForm.Activate();
     }
@@ -142,6 +166,8 @@ internal sealed class CompanionApplicationContext : ApplicationContext
 
     private void ApplyRuntimeStateAndRefreshUi()
     {
+        EnsureSummaryForm();
+
         var nowUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         _runtimeStateCalculator.ApplyRuntimeState(_currentSnapshot, nowUnix);
 
@@ -153,7 +179,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         NormalizeSelectedValues(_settings.SelectedProfessions, professions);
         NormalizeSelectedValues(_settings.SelectedExpansions, expansions);
 
-        _summaryForm.SetFilterOptions(characters, professions, expansions, _settings);
+        _summaryForm!.SetFilterOptions(characters, professions, expansions, _settings);
         var filteredCooldowns = _snapshotFilterService.ApplyFilters(_currentSnapshot, _settings);
         _summaryForm.UpdateSnapshot(_currentSnapshot, filteredCooldowns, _settings);
 
@@ -165,6 +191,11 @@ internal sealed class CompanionApplicationContext : ApplicationContext
 
     private void PersistFilters()
     {
+        if (_summaryForm is null || _summaryForm.IsDisposed)
+        {
+            return;
+        }
+
         _settings.SelectedCharacters = _summaryForm.GetSelectedCharacters();
         _settings.SelectedProfessions = _summaryForm.GetSelectedProfessions();
         _settings.SelectedExpansions = _summaryForm.GetSelectedExpansions();
