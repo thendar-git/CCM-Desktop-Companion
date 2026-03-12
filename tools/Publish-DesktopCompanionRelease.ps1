@@ -42,11 +42,12 @@ if ($LASTEXITCODE -ne 0) { throw 'git push failed.' }
 
 $credInput = "protocol=https`nhost=github.com`nusername=thendar-git`n"
 $cred = $credInput | git credential-manager get
-$tokenMatch = [regex]::Match($cred, '^password=(.+)$', [System.Text.RegularExpressions.RegexOptions]::Multiline)
+$credText = ($cred | Out-String)
+$tokenMatch = [regex]::Match($credText, '^password=(.+)$', [System.Text.RegularExpressions.RegexOptions]::Multiline)
 if (-not $tokenMatch.Success) {
     throw 'Unable to retrieve GitHub token from git credential-manager.'
 }
-$token = $tokenMatch.Groups[1].Value
+$token = $tokenMatch.Groups[1].Value.Trim()
 $headers = @{
     Authorization = "Bearer $token"
     Accept = 'application/vnd.github+json'
