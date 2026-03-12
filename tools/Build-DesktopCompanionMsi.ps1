@@ -11,10 +11,16 @@ $installerProj = Join-Path $installerDir 'CCM.DesktopCompanion.Installer.wixproj
 $publishDir = Join-Path $root 'artifacts\publish\'
 $msiOutDir = Join-Path $root 'Builds\'
 
+[xml]$projectXml = Get-Content -Path $appProj
+$version = $projectXml.Project.PropertyGroup.Version
+if ([string]::IsNullOrWhiteSpace($version)) {
+    throw 'Unable to determine application version from CCM.DesktopCompanion.csproj.'
+}
+
 New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
 New-Item -ItemType Directory -Force -Path $msiOutDir | Out-Null
 
-Write-Host 'Publishing desktop companion...'
+Write-Host "Publishing desktop companion v$version..."
 dotnet publish $appProj -c $Configuration -r win-x64 --self-contained true -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw 'dotnet publish failed.' }
 
@@ -49,9 +55,8 @@ $refLines.Add('</Include>')
 [System.IO.File]::WriteAllLines($componentsPath, $componentLines)
 [System.IO.File]::WriteAllLines($refsPath, $refLines)
 
-Write-Host 'Building MSI...'
-dotnet build $installerProj -c $Configuration -o $msiOutDir
+Write-Host "Building MSI for v$version..."
+dotnet build $installerProj -c $Configuration -o $msiOutDir -p:DefineConstants="AppVersion=$version"
 if ($LASTEXITCODE -ne 0) { throw 'dotnet build installer failed.' }
 
 Write-Host "MSI output:`n$msiOutDir"
-
