@@ -4,5 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <InstallerPlatform>x64</InstallerPlatform>
     <DefineConstants>AppVersion=1.0.4</DefineConstants>
+    <SuppressValidation>false</SuppressValidation>
+    <SuppressIces>ICE91</SuppressIces>
   </PropertyGroup>
 </Project>
