@@ -1,12 +1,17 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Fragment>
     <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="InstallFolderCleanupComponent" Guid="90AB7579-5A78-4C24-BB96-C455CB6D7B13">
+        <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Thendar\CCMDesktopCompanion" Name="InstallFolderCleanup" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
       <?include GeneratedComponents.wxi?>
     </DirectoryRef>
   </Fragment>
 
   <Fragment>
     <ComponentGroup Id="AppFiles">
+      <ComponentRef Id="InstallFolderCleanupComponent" />
       <?include GeneratedComponentRefs.wxi?>
     </ComponentGroup>
   </Fragment>

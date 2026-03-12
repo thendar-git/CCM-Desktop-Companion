@@ -36,7 +36,10 @@ foreach ($file in $files) {
     $guid = [guid]::NewGuid().ToString().ToUpperInvariant()
     $escapedName = [System.Security.SecurityElement]::Escape($file.Name)
     $escapedPath = [System.Security.SecurityElement]::Escape($file.FullName)
-    $componentLines.Add("  <Component Id=`"$id`" Guid=`"$guid`"><File Id=`"$fileId`" Source=`"$escapedPath`" Name=`"$escapedName`" KeyPath=`"yes`" /></Component>")
+    $componentLines.Add("  <Component Id=`"$id`" Guid=`"$guid`">")
+    $componentLines.Add("    <File Id=`"$fileId`" Source=`"$escapedPath`" Name=`"$escapedName`" KeyPath=`"no`" />")
+    $componentLines.Add("    <RegistryValue Root=`"HKCU`" Key=`"Software\Thendar\CCMDesktopCompanion\Components`" Name=`"$id`" Type=`"integer`" Value=`"1`" KeyPath=`"yes`" />")
+    $componentLines.Add('  </Component>')
     $refLines.Add("  <ComponentRef Id=`"$id`" />")
     $index++
 }
@@ -51,3 +54,4 @@ dotnet build $installerProj -c $Configuration -o $msiOutDir
 if ($LASTEXITCODE -ne 0) { throw 'dotnet build installer failed.' }
 
 Write-Host "MSI output:`n$msiOutDir"
+

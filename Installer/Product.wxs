@@ -9,8 +9,8 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of CCM Desktop Companion is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
-    <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="Crafting Cooldown Manager Desktop Companion" />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="INSTALLFOLDER" Name="CCM Desktop Companion" />
     </StandardDirectory>
 
     <StandardDirectory Id="ProgramMenuFolder">
