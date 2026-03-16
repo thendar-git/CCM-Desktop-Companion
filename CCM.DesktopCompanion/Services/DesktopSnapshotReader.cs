@@ -7,18 +7,35 @@ internal sealed class DesktopSnapshotReader
 {
     public string FindDefaultSavedVariablesPath()
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "World of Warcraft", "_retail_", "WTF", "Account");
-        if (!Directory.Exists(root))
+        // Allow override for diagnostics and custom installs.
+        var overridePath = Environment.GetEnvironmentVariable("CCM_SAVEDVARIABLES_PATH");
+        if (!string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath))
         {
-            return string.Empty;
+            return overridePath;
         }
 
-        foreach (var accountDirectory in Directory.GetDirectories(root))
+        var possibleRoots = new[]
         {
-            var candidate = Path.Combine(accountDirectory, "SavedVariables", "CCM.lua");
-            if (File.Exists(candidate))
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "World of Warcraft", "_retail_", "WTF", "Account"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "World of Warcraft", "_retail_", "WTF", "Account"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "World of Warcraft", "_classic_", "WTF", "Account"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "World of Warcraft", "_classic_", "WTF", "Account"),
+        };
+
+        foreach (var root in possibleRoots)
+        {
+            if (!Directory.Exists(root))
             {
-                return candidate;
+                continue;
+            }
+
+            foreach (var accountDirectory in Directory.GetDirectories(root))
+            {
+                var candidate = Path.Combine(accountDirectory, "SavedVariables", "CCM.lua");
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
             }
         }
 
