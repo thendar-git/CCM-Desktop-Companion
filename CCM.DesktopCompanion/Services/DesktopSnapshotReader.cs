@@ -14,13 +14,49 @@ internal sealed class DesktopSnapshotReader
             return overridePath;
         }
 
-        var possibleRoots = new[]
+        var possibleRoots = new List<string>();
+
+        if (OperatingSystem.IsWindows())
         {
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "World of Warcraft", "_retail_", "WTF", "Account"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "World of Warcraft", "_retail_", "WTF", "Account"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "World of Warcraft", "_classic_", "WTF", "Account"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "World of Warcraft", "_classic_", "WTF", "Account"),
-        };
+            try
+            {
+                var keys = new[]
+                {
+                    @"SOFTWARE\WOW6432Node\Blizzard Entertainment\World of Warcraft",
+                    @"SOFTWARE\Blizzard Entertainment\World of Warcraft"
+                };
+
+                foreach (var keyName in keys)
+                {
+                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(keyName);
+                    if (key?.GetValue("InstallPath") is string installPath && !string.IsNullOrWhiteSpace(installPath))
+                    {
+                        var normalizedPath = installPath.TrimEnd('\\', '/');
+                        var parent = Directory.GetParent(normalizedPath)?.FullName;
+                        
+                        // The registry usually points to a specific flavor e.g. C:\Program Files (x86)\World of Warcraft\_retail_\
+                        possibleRoots.Add(Path.Combine(normalizedPath, "WTF", "Account"));
+
+                        // Also try looking at the parent directory
+                        if (!string.IsNullOrWhiteSpace(parent))
+                        {
+                            possibleRoots.Add(Path.Combine(parent, "_retail_", "WTF", "Account"));
+                            possibleRoots.Add(Path.Combine(parent, "_classic_", "WTF", "Account"));
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore registry access errors
+            }
+        }
+
+        // Add fallback hardcoded paths
+        possibleRoots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "World of Warcraft", "_retail_", "WTF", "Account"));
+        possibleRoots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "World of Warcraft", "_retail_", "WTF", "Account"));
+        possibleRoots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "World of Warcraft", "_classic_", "WTF", "Account"));
+        possibleRoots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "World of Warcraft", "_classic_", "WTF", "Account"));
 
         foreach (var root in possibleRoots)
         {
