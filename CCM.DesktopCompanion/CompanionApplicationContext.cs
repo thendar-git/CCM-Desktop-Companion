@@ -14,7 +14,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
     private SummaryForm? _summaryForm;
     private FormWindowState _summaryRestoreWindowState = FormWindowState.Normal;
     private readonly DesktopSnapshotReader _reader;
-    private readonly SavedVariablesWatcher _watcher;
+    private SavedVariablesWatcher? _watcher;
     private readonly RuntimeStateCalculator _runtimeStateCalculator;
     private readonly NotificationService _notificationService;
     private readonly SnapshotFilterService _snapshotFilterService;
@@ -70,14 +70,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
             }
         };
 
-        var savedVariablesPath = _reader.FindDefaultSavedVariablesPath();
-        CompanionLog.Write(string.IsNullOrWhiteSpace(savedVariablesPath)
-            ? "No CCM.lua SavedVariables file was found."
-            : $"Watching SavedVariables file: {savedVariablesPath}");
-
-        _watcher = new SavedVariablesWatcher(savedVariablesPath);
-        _watcher.SavedVariablesChanged += (_, _) => RefreshSnapshot();
-        _watcher.Start();
+        RebuildWatcher(GetSavedVariablesPath());
 
         _runtimeTimer = new System.Windows.Forms.Timer
         {
@@ -93,7 +86,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
     {
         CompanionLog.Write("Companion application context shutting down.");
         PersistFilters();
-        _watcher.Dispose();
+        _watcher?.Dispose();
         _runtimeTimer.Stop();
         _runtimeTimer.Dispose();
         _notifyIcon.Visible = false;
@@ -135,6 +128,13 @@ internal sealed class CompanionApplicationContext : ApplicationContext
             _settings.SortAscending = ascending;
             _settingsService.Save(_settings);
         };
+        form.SavedVariablesPathChanged += path =>
+        {
+            _settings.SavedVariablesFilePath = path;
+            _settingsService.Save(_settings);
+            RebuildWatcher(GetSavedVariablesPath());
+            RefreshSnapshot();
+        };
         form.FormClosing += (_, args) =>
         {
             if (args.CloseReason == CloseReason.UserClosing)
@@ -155,6 +155,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         };
 
         _summaryForm = form;
+        _summaryForm.SetSavedVariablesPath(GetSavedVariablesPath());
     }
 
     private void ShowSummary()
@@ -172,7 +173,9 @@ internal sealed class CompanionApplicationContext : ApplicationContext
 
     private void RefreshSnapshot()
     {
-        if (_reader.TryReadSnapshot(out var snapshot))
+        var savedVariablesPath = GetSavedVariablesPath();
+        _summaryForm?.SetSavedVariablesPath(savedVariablesPath);
+        if (_reader.TryReadSnapshot(savedVariablesPath, out var snapshot))
         {
             _currentSnapshot = snapshot;
             CompanionLog.Write($"Loaded snapshot. Schema={snapshot.SchemaVersion}; Source={snapshot.SourceFile}; Characters={snapshot.Characters.Count}; Cooldowns={snapshot.Cooldowns.Count}");
@@ -259,6 +262,23 @@ internal sealed class CompanionApplicationContext : ApplicationContext
     private static void NormalizeSelectedValues(HashSet<string> selectedValues, IReadOnlyList<string> validValues)
     {
         selectedValues.RemoveWhere(value => !validValues.Contains(value, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private string GetSavedVariablesPath()
+    {
+        return _reader.ResolveSavedVariablesPath(_settings.SavedVariablesFilePath);
+    }
+
+    private void RebuildWatcher(string savedVariablesPath)
+    {
+        _watcher?.Dispose();
+        CompanionLog.Write(string.IsNullOrWhiteSpace(savedVariablesPath)
+            ? "No CCM.lua SavedVariables file was found."
+            : $"Watching SavedVariables file: {savedVariablesPath}");
+
+        _watcher = new SavedVariablesWatcher(savedVariablesPath);
+        _watcher.SavedVariablesChanged += (_, _) => RefreshSnapshot();
+        _watcher.Start();
     }
 }
 

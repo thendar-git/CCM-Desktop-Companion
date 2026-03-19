@@ -1,4 +1,5 @@
 using System.Drawing;
+using System.IO;
 using System.Windows.Forms;
 using CCM.DesktopCompanion.Models;
 
@@ -7,6 +8,8 @@ namespace CCM.DesktopCompanion.UI;
 internal sealed class SummaryForm : Form
 {
     private readonly Label _summaryLabel;
+    private readonly TextBox _savedVariablesPathText;
+    private readonly Button _browseSavedVariablesButton;
     private readonly CheckedListBox _characterFilter;
     private readonly CheckedListBox _professionFilter;
     private readonly CheckedListBox _expansionFilter;
@@ -19,6 +22,7 @@ internal sealed class SummaryForm : Form
     public event EventHandler? FiltersChanged;
     public event Action<CooldownRecord, bool>? NotificationEnabledChanged;
     public event Action<string, bool>? SortChanged;
+    public event Action<string>? SavedVariablesPathChanged;
 
     public SummaryForm()
     {
@@ -28,14 +32,67 @@ internal sealed class SummaryForm : Form
         MinimumSize = new Size(1140, 640);
         StartPosition = FormStartPosition.CenterScreen;
 
-        _summaryLabel = new Label
+        var topBar = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
+            Height = 72,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(12, 0, 12, 0),
+        };
+        topBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        topBar.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
+        topBar.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));
+
+        _summaryLabel = new Label
+        {
+            Dock = DockStyle.Fill,
             Height = 32,
             TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(12, 0, 0, 0),
             Text = "Waiting for CCM desktop snapshot...",
         };
+        topBar.Controls.Add(_summaryLabel, 0, 0);
+
+        var settingsBar = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 3,
+            RowCount = 1,
+            Margin = new Padding(0, 0, 0, 4),
+        };
+        settingsBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        settingsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        settingsBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        var savedVariablesLabel = new Label
+        {
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Text = "SavedVariables file:",
+            Margin = new Padding(0, 0, 8, 0),
+        };
+
+        _savedVariablesPathText = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            Margin = new Padding(0, 6, 8, 6),
+        };
+
+        _browseSavedVariablesButton = new Button
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Anchor = AnchorStyles.Right,
+            Text = "Browse...",
+            Margin = new Padding(0, 4, 0, 4),
+        };
+        _browseSavedVariablesButton.Click += (_, _) => BrowseForSavedVariablesPath();
+
+        settingsBar.Controls.Add(savedVariablesLabel, 0, 0);
+        settingsBar.Controls.Add(_savedVariablesPathText, 1, 0);
+        settingsBar.Controls.Add(_browseSavedVariablesButton, 2, 0);
+        topBar.Controls.Add(settingsBar, 0, 1);
 
         var filterPanel = new TableLayoutPanel
         {
@@ -89,7 +146,7 @@ internal sealed class SummaryForm : Form
 
         Controls.Add(_cooldownGrid);
         Controls.Add(filterPanel);
-        Controls.Add(_summaryLabel);
+        Controls.Add(topBar);
     }
 
     public void SetFilterOptions(IReadOnlyList<string> characters, IReadOnlyList<string> professions, IReadOnlyList<string> expansions, DesktopCompanionSettings settings)
@@ -138,6 +195,13 @@ internal sealed class SummaryForm : Form
 
         UpdateSortGlyphs();
         _cooldownGrid.ResumeLayout();
+    }
+
+    public void SetSavedVariablesPath(string path)
+    {
+        _savedVariablesPathText.Text = string.IsNullOrWhiteSpace(path)
+            ? "Browse to CCM.lua"
+            : path;
     }
 
     public HashSet<string> GetSelectedCharacters() => GetSelectedValues(_characterFilter);
@@ -288,6 +352,51 @@ internal sealed class SummaryForm : Form
             .Select(item => item.ToString() ?? string.Empty)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .ToHashSet(StringComparer.Ordinal);
+    }
+
+    private void BrowseForSavedVariablesPath()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Title = "Select CCM.lua SavedVariables file",
+            Filter = "CCM SavedVariables (CCM.lua)|CCM.lua|Lua files (*.lua)|*.lua|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+
+        var currentPath = _savedVariablesPathText.Text;
+        if (!string.IsNullOrWhiteSpace(currentPath) && !string.Equals(currentPath, "Browse to CCM.lua", StringComparison.Ordinal))
+        {
+            try
+            {
+                var initialDirectory = Path.GetDirectoryName(currentPath);
+                if (!string.IsNullOrWhiteSpace(initialDirectory) && Directory.Exists(initialDirectory))
+                {
+                    dialog.InitialDirectory = initialDirectory;
+                }
+                var fileName = Path.GetFileName(currentPath);
+                if (!string.IsNullOrWhiteSpace(fileName))
+                {
+                    dialog.FileName = fileName;
+                }
+            }
+            catch
+            {
+                // Ignore malformed path values in the UI field.
+            }
+        }
+        else
+        {
+            dialog.FileName = "CCM.lua";
+        }
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        SetSavedVariablesPath(dialog.FileName);
+        SavedVariablesPathChanged?.Invoke(dialog.FileName);
     }
 
     private IEnumerable<CooldownRecord> SortCooldowns(IReadOnlyList<CooldownRecord> visibleCooldowns)

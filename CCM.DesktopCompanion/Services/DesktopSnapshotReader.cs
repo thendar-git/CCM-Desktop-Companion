@@ -5,6 +5,16 @@ namespace CCM.DesktopCompanion.Services;
 
 internal sealed class DesktopSnapshotReader
 {
+    public string ResolveSavedVariablesPath(string? configuredPath)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return configuredPath;
+        }
+
+        return FindDefaultSavedVariablesPath();
+    }
+
     public string FindDefaultSavedVariablesPath()
     {
         // Allow override for diagnostics and custom installs.
@@ -78,10 +88,9 @@ internal sealed class DesktopSnapshotReader
         return string.Empty;
     }
 
-    public bool TryReadSnapshot(out DesktopSnapshot snapshot)
+    public bool TryReadSnapshot(string? filePath, out DesktopSnapshot snapshot)
     {
         snapshot = DesktopSnapshot.Empty;
-        var filePath = FindDefaultSavedVariablesPath();
         if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
         {
             return false;
@@ -104,8 +113,8 @@ internal sealed class DesktopSnapshotReader
         var dbMarkerIndex = content.IndexOf(dbMarker, StringComparison.Ordinal);
         if (dbMarkerIndex < 0)
         {
-            return false;
-        }
+        return false;
+    }
 
         var dbParser = new LuaTableParser(content, dbMarkerIndex + "CCM_DB = ".Length);
         if (!dbParser.TryParseValue(out var dbValue) || dbValue is not LuaTable dbTable)

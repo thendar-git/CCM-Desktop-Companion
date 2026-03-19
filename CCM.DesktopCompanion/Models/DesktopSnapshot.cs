@@ -64,6 +64,7 @@ internal sealed class DesktopCompanionSettings
     public bool CharactersInitialized { get; set; }
     public bool ProfessionsInitialized { get; set; }
     public bool ExpansionsInitialized { get; set; }
+    public string SavedVariablesFilePath { get; set; } = string.Empty;
     public string SortColumnName { get; set; } = "Ready";
     public bool SortAscending { get; set; } = true;
     public HashSet<string> SelectedCharacters { get; set; } = [];
