@@ -13,6 +13,7 @@ internal sealed class SummaryForm : Form
     private readonly CheckedListBox _characterFilter;
     private readonly CheckedListBox _professionFilter;
     private readonly CheckedListBox _expansionFilter;
+    private readonly CheckedListBox _itemFilter;
     private readonly DataGridView _cooldownGrid;
     private List<CooldownRecord> _visibleCooldowns = [];
     private bool _isUpdatingFilters;
@@ -27,9 +28,9 @@ internal sealed class SummaryForm : Form
     public SummaryForm()
     {
         Text = "CCM Desktop Companion";
-        Width = 1140;
+        Width = 1340;
         Height = 640;
-        MinimumSize = new Size(1140, 640);
+        MinimumSize = new Size(1340, 640);
         StartPosition = FormStartPosition.CenterScreen;
 
         var topBar = new TableLayoutPanel
@@ -98,26 +99,30 @@ internal sealed class SummaryForm : Form
         {
             Dock = DockStyle.Top,
             Height = 180,
-            ColumnCount = 3,
+            ColumnCount = 4,
             RowCount = 2,
             Padding = new Padding(12, 8, 12, 8),
         };
-        filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
-        filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
-        filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.333f));
+        filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
         filterPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         filterPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
         _characterFilter = BuildFilterList();
         _professionFilter = BuildFilterList();
         _expansionFilter = BuildFilterList();
+        _itemFilter = BuildFilterList();
 
         filterPanel.Controls.Add(BuildFilterGroup("Characters", _characterFilter), 0, 0);
         filterPanel.Controls.Add(BuildFilterGroup("Professions", _professionFilter), 1, 0);
         filterPanel.Controls.Add(BuildFilterGroup("Expansions", _expansionFilter), 2, 0);
+        filterPanel.Controls.Add(BuildFilterGroup("Cooldown Items", _itemFilter), 3, 0);
         filterPanel.SetRowSpan(filterPanel.Controls[0], 2);
         filterPanel.SetRowSpan(filterPanel.Controls[1], 2);
         filterPanel.SetRowSpan(filterPanel.Controls[2], 2);
+        filterPanel.SetRowSpan(filterPanel.Controls[3], 2);
 
         _cooldownGrid = new DataGridView
         {
@@ -149,7 +154,7 @@ internal sealed class SummaryForm : Form
         Controls.Add(topBar);
     }
 
-    public void SetFilterOptions(IReadOnlyList<string> characters, IReadOnlyList<string> professions, IReadOnlyList<string> expansions, DesktopCompanionSettings settings)
+    public void SetFilterOptions(IReadOnlyList<string> characters, IReadOnlyList<string> professions, IReadOnlyList<string> expansions, IReadOnlyList<string> items, DesktopCompanionSettings settings)
     {
         _sortColumnName = settings.SortColumnName;
         _sortAscending = settings.SortAscending;
@@ -160,6 +165,7 @@ internal sealed class SummaryForm : Form
             ApplyFilterItems(_characterFilter, characters, settings.SelectedCharacters);
             ApplyFilterItems(_professionFilter, professions, settings.SelectedProfessions);
             ApplyFilterItems(_expansionFilter, expansions, settings.SelectedExpansions);
+            ApplyFilterItems(_itemFilter, items, settings.SelectedItems);
         }
         finally
         {
@@ -189,7 +195,8 @@ internal sealed class SummaryForm : Form
                 cooldown.ItemName,
                 FormatReady(cooldown),
                 cooldown.ReadyChargesNow.ToString(),
-                FormatNextCharge(cooldown));
+                FormatNextCharge(cooldown),
+                FormatConcentration(cooldown));
             _cooldownGrid.Rows[^1].Tag = cooldown;
         }
 
@@ -207,6 +214,7 @@ internal sealed class SummaryForm : Form
     public HashSet<string> GetSelectedCharacters() => GetSelectedValues(_characterFilter);
     public HashSet<string> GetSelectedProfessions() => GetSelectedValues(_professionFilter);
     public HashSet<string> GetSelectedExpansions() => GetSelectedValues(_expansionFilter);
+    public HashSet<string> GetSelectedItems() => GetSelectedValues(_itemFilter);
 
     private static CheckedListBox BuildFilterList()
     {
@@ -240,6 +248,7 @@ internal sealed class SummaryForm : Form
         _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Ready", HeaderText = "READY", Width = 60, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
         _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Charges", HeaderText = "Charges", Width = 70, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
         _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "NextCharge", HeaderText = "Next Charge", Width = 110, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Concentration", HeaderText = "Concentration", Width = 110, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
     }
 
     private GroupBox BuildFilterGroup(string title, CheckedListBox list)
@@ -423,6 +432,7 @@ internal sealed class SummaryForm : Form
             "ItemName" => cooldown => cooldown.ItemName,
             "Charges" => cooldown => cooldown.ReadyChargesNow,
             "NextCharge" => cooldown => cooldown.NextChargeRemainingSeconds ?? int.MaxValue,
+            "Concentration" => cooldown => cooldown.ConcentrationSimulated ?? -1,
             _ => cooldown => cooldown.GetCharacterDisplayName(),
         };
 
@@ -442,6 +452,16 @@ internal sealed class SummaryForm : Form
         {
             _cooldownGrid.Columns[_sortColumnName].HeaderCell.SortGlyphDirection = _sortAscending ? SortOrder.Ascending : SortOrder.Descending;
         }
+    }
+
+    private static string FormatConcentration(CooldownRecord cooldown)
+    {
+        if (cooldown.ConcentrationSimulated == null || cooldown.ConcentrationMaximum == null)
+        {
+            return string.Empty;
+        }
+
+        return $"{cooldown.ConcentrationSimulated} / {cooldown.ConcentrationMaximum}";
     }
 
     private static string FormatReady(CooldownRecord cooldown)

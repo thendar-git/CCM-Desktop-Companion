@@ -199,12 +199,14 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         var characters = _snapshotFilterService.GetCharacterOptions(_currentSnapshot);
         var professions = _snapshotFilterService.GetProfessionOptions(_currentSnapshot);
         var expansions = _snapshotFilterService.GetExpansionOptions(_currentSnapshot);
-        EnsureInitializedSelections(characters, professions, expansions);
+        var items = _snapshotFilterService.GetItemOptions(_currentSnapshot);
+        EnsureInitializedSelections(characters, professions, expansions, items);
         NormalizeSelectedValues(_settings.SelectedCharacters, characters);
         NormalizeSelectedValues(_settings.SelectedProfessions, professions);
         NormalizeSelectedValues(_settings.SelectedExpansions, expansions);
+        NormalizeSelectedValues(_settings.SelectedItems, items);
 
-        _summaryForm!.SetFilterOptions(characters, professions, expansions, _settings);
+        _summaryForm!.SetFilterOptions(characters, professions, expansions, items, _settings);
         var filteredCooldowns = _snapshotFilterService.ApplyFilters(_currentSnapshot, _settings);
         _summaryForm.UpdateSnapshot(_currentSnapshot, filteredCooldowns, _settings);
 
@@ -224,13 +226,15 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         _settings.SelectedCharacters = _summaryForm.GetSelectedCharacters();
         _settings.SelectedProfessions = _summaryForm.GetSelectedProfessions();
         _settings.SelectedExpansions = _summaryForm.GetSelectedExpansions();
+        _settings.SelectedItems = _summaryForm.GetSelectedItems();
         _settings.CharactersInitialized = true;
         _settings.ProfessionsInitialized = true;
         _settings.ExpansionsInitialized = true;
+        _settings.ItemsInitialized = true;
         _settingsService.Save(_settings);
     }
 
-    private void EnsureInitializedSelections(IReadOnlyList<string> characters, IReadOnlyList<string> professions, IReadOnlyList<string> expansions)
+    private void EnsureInitializedSelections(IReadOnlyList<string> characters, IReadOnlyList<string> professions, IReadOnlyList<string> expansions, IReadOnlyList<string> items)
     {
         var hasChanges = false;
 
@@ -250,6 +254,12 @@ internal sealed class CompanionApplicationContext : ApplicationContext
         {
             _settings.SelectedExpansions = expansions.ToHashSet(StringComparer.Ordinal);
             _settings.ExpansionsInitialized = true;
+            hasChanges = true;
+        }
+        if (!_settings.ItemsInitialized)
+        {
+            _settings.SelectedItems = items.ToHashSet(StringComparer.Ordinal);
+            _settings.ItemsInitialized = true;
             hasChanges = true;
         }
 

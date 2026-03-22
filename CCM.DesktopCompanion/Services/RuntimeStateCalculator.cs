@@ -13,6 +13,7 @@ internal sealed class RuntimeStateCalculator
             var (readyCharges, nextRemaining) = GetChargeRuntimeState(cooldown, nowUnix);
             cooldown.ReadyChargesNow = readyCharges;
             cooldown.NextChargeRemainingSeconds = nextRemaining;
+            cooldown.ConcentrationSimulated = GetConcentrationSimulated(cooldown, nowUnix);
         }
 
         return snapshot;
@@ -93,6 +94,18 @@ internal sealed class RuntimeStateCalculator
             return (1, 0);
         }
         return (0, SanitizeRemaining(remaining));
+    }
+
+    private static int? GetConcentrationSimulated(CooldownRecord cooldown, long now)
+    {
+        if (cooldown.ConcentrationCurrent == null || cooldown.ConcentrationMaximum == null)
+        {
+            return null;
+        }
+
+        var scanTime = cooldown.ConcentrationScanTime ?? now;
+        var gained = (int)Math.Max(0, now - scanTime) / 360;
+        return Math.Min(cooldown.ConcentrationMaximum.Value, cooldown.ConcentrationCurrent.Value + gained);
     }
 
     private static int? SanitizeRemaining(int remainingSeconds)

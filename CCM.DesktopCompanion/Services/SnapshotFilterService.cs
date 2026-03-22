@@ -11,6 +11,7 @@ internal sealed class SnapshotFilterService
             .Where(cooldown => Matches(settings.SelectedCharacters, cooldown.GetCharacterDisplayName()))
             .Where(cooldown => Matches(settings.SelectedProfessions, cooldown.Profession))
             .Where(cooldown => Matches(settings.SelectedExpansions, NormalizeExpansion(cooldown.Expansion)))
+            .Where(cooldown => Matches(settings.SelectedItems, cooldown.ItemName))
             .ToList();
     }
 
@@ -27,6 +28,16 @@ internal sealed class SnapshotFilterService
     {
         return snapshot.Cooldowns
             .Select(cooldown => cooldown.Profession)
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public IReadOnlyList<string> GetItemOptions(DesktopSnapshot snapshot)
+    {
+        return snapshot.Cooldowns
+            .Select(cooldown => cooldown.ItemName)
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)

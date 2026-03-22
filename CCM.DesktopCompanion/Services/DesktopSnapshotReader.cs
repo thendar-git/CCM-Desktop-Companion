@@ -122,6 +122,15 @@ internal sealed class DesktopSnapshotReader
             return false;
         }
 
+        // Current format: desktopSnapshot nested inside CCM_DB as ["desktopSnapshot"] = { ... }
+        var nestedSnapshot = dbTable.GetTable("desktopSnapshot");
+        if (nestedSnapshot != null)
+        {
+            snapshot = MapSnapshot(nestedSnapshot, filePath);
+            return true;
+        }
+
+        // Older legacy format: cooldowns and characters stored directly in CCM_DB
         snapshot = MapLegacySnapshot(dbTable, filePath, File.GetLastWriteTimeUtc(filePath));
         return true;
     }
@@ -183,6 +192,9 @@ internal sealed class DesktopSnapshotReader
                     ReadyTime = entry.GetLong("readyTime"),
                     Enabled = entry.GetBool("enabled", true),
                     Source = entry.GetString("source"),
+                    ConcentrationCurrent = entry.GetNullableInt("concentrationCurrent"),
+                    ConcentrationMaximum = entry.GetNullableInt("concentrationMaximum"),
+                    ConcentrationScanTime = entry.GetNullableLong("concentrationScanTime"),
                 });
             }
         }
@@ -252,6 +264,9 @@ internal sealed class DesktopSnapshotReader
                     ReadyTime = entry.GetLong("readyTime"),
                     Enabled = entry.GetBool("enabled", true),
                     Source = entry.GetString("source"),
+                    ConcentrationCurrent = entry.GetNullableInt("concentrationCurrent"),
+                    ConcentrationMaximum = entry.GetNullableInt("concentrationMaximum"),
+                    ConcentrationScanTime = entry.GetNullableLong("concentrationScanTime"),
                 });
             }
         }

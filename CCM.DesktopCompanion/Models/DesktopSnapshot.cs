@@ -42,8 +42,13 @@ internal sealed class CooldownRecord
     public bool Enabled { get; set; } = true;
     public string Source { get; set; } = string.Empty;
 
+    public int? ConcentrationCurrent { get; set; }
+    public int? ConcentrationMaximum { get; set; }
+    public long? ConcentrationScanTime { get; set; }
+
     public int ReadyChargesNow { get; set; }
     public int? NextChargeRemainingSeconds { get; set; }
+    public int? ConcentrationSimulated { get; set; }
 
     public string GetNotificationKey()
     {
@@ -64,12 +69,14 @@ internal sealed class DesktopCompanionSettings
     public bool CharactersInitialized { get; set; }
     public bool ProfessionsInitialized { get; set; }
     public bool ExpansionsInitialized { get; set; }
+    public bool ItemsInitialized { get; set; }
     public string SavedVariablesFilePath { get; set; } = string.Empty;
     public string SortColumnName { get; set; } = "Ready";
     public bool SortAscending { get; set; } = true;
     public HashSet<string> SelectedCharacters { get; set; } = [];
     public HashSet<string> SelectedProfessions { get; set; } = [];
     public HashSet<string> SelectedExpansions { get; set; } = [];
+    public HashSet<string> SelectedItems { get; set; } = [];
     public Dictionary<string, bool> NotificationEnabledByKey { get; set; } = new(StringComparer.Ordinal);
 
     public bool IsNotificationEnabled(CooldownRecord cooldown)
