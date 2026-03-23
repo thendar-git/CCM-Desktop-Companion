@@ -28,9 +28,9 @@ internal sealed class SummaryForm : Form
     public SummaryForm()
     {
         Text = "CCM Desktop Companion";
-        Width = 1340;
+        Width = 1195;
         Height = 640;
-        MinimumSize = new Size(1340, 640);
+        MinimumSize = new Size(1195, 640);
         StartPosition = FormStartPosition.CenterScreen;
 
         var topBar = new TableLayoutPanel
@@ -223,6 +223,7 @@ internal sealed class SummaryForm : Form
             Dock = DockStyle.Fill,
             CheckOnClick = true,
             IntegralHeight = false,
+            ScrollAlwaysVisible = true,
         };
     }
 
