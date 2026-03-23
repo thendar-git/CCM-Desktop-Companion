@@ -194,7 +194,7 @@ internal sealed class SummaryForm : Form
                 string.IsNullOrWhiteSpace(cooldown.Expansion) ? "Unknown" : cooldown.Expansion,
                 cooldown.ItemName,
                 FormatReady(cooldown),
-                cooldown.ReadyChargesNow.ToString(),
+                FormatCharges(cooldown),
                 FormatNextCharge(cooldown),
                 FormatConcentration(cooldown));
             _cooldownGrid.Rows[^1].Tag = cooldown;
@@ -430,7 +430,9 @@ internal sealed class SummaryForm : Form
             "Profession" => cooldown => cooldown.Profession,
             "Expansion" => cooldown => string.IsNullOrWhiteSpace(cooldown.Expansion) ? "Unknown" : cooldown.Expansion,
             "ItemName" => cooldown => cooldown.ItemName,
-            "Charges" => cooldown => cooldown.ReadyChargesNow,
+            "Charges" => cooldown => (cooldown.MaxCharges.HasValue && cooldown.MaxCharges.Value > 0)
+                ? (double)cooldown.ReadyChargesNow / cooldown.MaxCharges.Value
+                : cooldown.ReadyChargesNow,
             "NextCharge" => cooldown => cooldown.NextChargeRemainingSeconds ?? int.MaxValue,
             "Concentration" => cooldown => cooldown.ConcentrationSimulated ?? -1,
             _ => cooldown => cooldown.GetCharacterDisplayName(),
@@ -454,6 +456,17 @@ internal sealed class SummaryForm : Form
         }
     }
 
+    private static string FormatCharges(CooldownRecord cooldown)
+    {
+        var max = cooldown.MaxCharges;
+        if (max.HasValue && max.Value > 0)
+        {
+            return $"{cooldown.ReadyChargesNow} / {max.Value}";
+        }
+
+        return cooldown.ReadyChargesNow.ToString();
+    }
+
     private static string FormatConcentration(CooldownRecord cooldown)
     {
         if (cooldown.ConcentrationSimulated == null || cooldown.ConcentrationMaximum == null)
@@ -473,7 +486,7 @@ internal sealed class SummaryForm : Form
     {
         if (cooldown.NextChargeRemainingSeconds == null)
         {
-            return "n/a";
+            return cooldown.ReadyChargesNow > 0 ? "\u2014" : "n/a";
         }
 
         return FormatDuration(cooldown.NextChargeRemainingSeconds.Value);

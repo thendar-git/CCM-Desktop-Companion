@@ -127,6 +127,8 @@ internal sealed class DesktopSnapshotReader
         if (nestedSnapshot != null)
         {
             snapshot = MapSnapshot(nestedSnapshot, filePath);
+            // Enrich snapshot cooldowns with fresh charge and concentration data from CCM_DB.cooldowns
+            EnrichFromMainCooldowns(snapshot, dbTable.GetTable("cooldowns"));
             return true;
         }
 
@@ -272,6 +274,65 @@ internal sealed class DesktopSnapshotReader
         }
 
         return snapshot;
+    }
+
+    private static void EnrichFromMainCooldowns(DesktopSnapshot snapshot, LuaTable? mainCooldownsTable)
+    {
+        if (mainCooldownsTable == null)
+        {
+            return;
+        }
+
+        var byKey = new Dictionary<string, LuaTable>(StringComparer.Ordinal);
+        foreach (var entry in mainCooldownsTable.ArrayValues.OfType<LuaTable>())
+        {
+            var recipeId = entry.GetNullableLong("recipeID");
+            var charKey = entry.GetString("characterKey");
+            if (recipeId.HasValue && !string.IsNullOrWhiteSpace(charKey))
+            {
+                byKey[$"{charKey}|{recipeId}"] = entry;
+            }
+        }
+
+        foreach (var cooldown in snapshot.Cooldowns)
+        {
+            if (!cooldown.RecipeId.HasValue || string.IsNullOrWhiteSpace(cooldown.CharacterKey))
+            {
+                continue;
+            }
+
+            var key = $"{cooldown.CharacterKey}|{cooldown.RecipeId}";
+            if (!byKey.TryGetValue(key, out var main))
+            {
+                continue;
+            }
+
+            cooldown.ConcentrationCurrent = main.GetNullableInt("concentrationCurrent");
+            cooldown.ConcentrationMaximum = main.GetNullableInt("concentrationMaximum");
+            cooldown.ConcentrationScanTime = main.GetNullableLong("concentrationScanTime");
+
+            var mainCurrentCharges = main.GetNullableInt("currentCharges");
+            var mainMaxCharges = main.GetNullableInt("maxCharges");
+            var mainReadyTime = main.GetLong("readyTime");
+            var mainDuration = main.GetInt("durationSeconds");
+
+            if (mainCurrentCharges.HasValue)
+            {
+                cooldown.CurrentCharges = mainCurrentCharges;
+            }
+            if (mainMaxCharges.HasValue)
+            {
+                cooldown.MaxCharges = mainMaxCharges;
+            }
+            if (mainReadyTime > 0)
+            {
+                cooldown.ReadyTime = mainReadyTime;
+            }
+            if (mainDuration > 0)
+            {
+                cooldown.DurationSeconds = mainDuration;
+            }
+        }
     }
 
     private sealed class LuaTableParser
