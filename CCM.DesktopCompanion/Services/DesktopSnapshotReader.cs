@@ -283,6 +283,16 @@ internal sealed class DesktopSnapshotReader
             return;
         }
 
+        // Build lookup of existing snapshot entries
+        var snapshotKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var cooldown in snapshot.Cooldowns)
+        {
+            if (cooldown.RecipeId.HasValue && !string.IsNullOrWhiteSpace(cooldown.CharacterKey))
+            {
+                snapshotKeys.Add($"{cooldown.CharacterKey}|{cooldown.RecipeId}");
+            }
+        }
+
         var byKey = new Dictionary<string, LuaTable>(StringComparer.Ordinal);
         foreach (var entry in mainCooldownsTable.ArrayValues.OfType<LuaTable>())
         {
@@ -294,6 +304,7 @@ internal sealed class DesktopSnapshotReader
             }
         }
 
+        // Update existing snapshot records with fresh charge + concentration data
         foreach (var cooldown in snapshot.Cooldowns)
         {
             if (!cooldown.RecipeId.HasValue || string.IsNullOrWhiteSpace(cooldown.CharacterKey))
@@ -332,6 +343,36 @@ internal sealed class DesktopSnapshotReader
             {
                 cooldown.DurationSeconds = mainDuration;
             }
+        }
+
+        // Add records from main cooldowns that are absent from the snapshot
+        foreach (var (key, entry) in byKey)
+        {
+            if (snapshotKeys.Contains(key))
+            {
+                continue;
+            }
+
+            snapshot.Cooldowns.Add(new CooldownRecord
+            {
+                Id = entry.GetLong("id"),
+                CharacterKey = entry.GetString("characterKey"),
+                CharacterName = entry.GetString("characterName"),
+                RealmName = entry.GetString("realmName"),
+                Profession = entry.GetString("profession"),
+                ItemName = entry.GetString("itemName"),
+                Expansion = entry.GetString("expansion"),
+                RecipeId = entry.GetNullableLong("recipeID"),
+                CurrentCharges = entry.GetNullableInt("currentCharges"),
+                MaxCharges = entry.GetNullableInt("maxCharges"),
+                DurationSeconds = entry.GetInt("durationSeconds"),
+                ReadyTime = entry.GetLong("readyTime"),
+                Enabled = entry.GetBool("enabled", true),
+                Source = entry.GetString("source"),
+                ConcentrationCurrent = entry.GetNullableInt("concentrationCurrent"),
+                ConcentrationMaximum = entry.GetNullableInt("concentrationMaximum"),
+                ConcentrationScanTime = entry.GetNullableLong("concentrationScanTime"),
+            });
         }
     }
 
