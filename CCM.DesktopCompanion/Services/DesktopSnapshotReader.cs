@@ -156,7 +156,7 @@ internal sealed class DesktopSnapshotReader
                     CharacterKey = entry.GetString("characterKey"),
                     CharacterName = entry.GetString("characterName"),
                     RealmName = entry.GetString("realmName"),
-                    Class = entry.GetString("class"),
+                    Class = entry.GetString("classFile"),
                 };
                 var professions = entry.GetTable("professions");
                 if (professions != null)
@@ -229,7 +229,7 @@ internal sealed class DesktopSnapshotReader
                     CharacterKey = entry.GetString("key"),
                     CharacterName = entry.GetString("name"),
                     RealmName = entry.GetString("realm"),
-                    Class = entry.GetString("class"),
+                    Class = entry.GetString("classFile"),
                 };
                 var professions = entry.GetTable("professions");
                 if (professions != null)

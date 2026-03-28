@@ -38,66 +38,65 @@ internal static class WowTheme
     public static readonly Color ReadyYes    = Color.FromArgb(0x1E, 0xFF, 0x00);
     public static readonly Color ReadyNo     = Color.FromArgb(0xFF, 0x44, 0x44);
 
-    // WoW class colors (dark mode)
+    // WoW class colors keyed by classFile identifier (as stored by the CCM addon)
+    // Hex values match CLASS_COLORS in CCM.lua exactly
     private static readonly Dictionary<string, Color> ClassColors = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["DeathKnight"]  = Color.FromArgb(0xC4, 0x1E, 0x3A),
-        ["Death Knight"] = Color.FromArgb(0xC4, 0x1E, 0x3A),
-        ["DemonHunter"]  = Color.FromArgb(0xA3, 0x30, 0xC9),
-        ["Demon Hunter"] = Color.FromArgb(0xA3, 0x30, 0xC9),
-        ["Druid"]        = Color.FromArgb(0xFF, 0x7C, 0x0A),
-        ["Evoker"]       = Color.FromArgb(0x33, 0x93, 0x7F),
-        ["Hunter"]       = Color.FromArgb(0xAA, 0xD3, 0x72),
-        ["Mage"]         = Color.FromArgb(0x3F, 0xC7, 0xEB),
-        ["Monk"]         = Color.FromArgb(0x00, 0xFF, 0x98),
-        ["Paladin"]      = Color.FromArgb(0xF4, 0x8C, 0xBA),
-        ["Priest"]       = Color.FromArgb(0xF0, 0xEB, 0xE0),
-        ["Rogue"]        = Color.FromArgb(0xFF, 0xF4, 0x68),
-        ["Shaman"]       = Color.FromArgb(0x00, 0x70, 0xDD),
-        ["Warlock"]      = Color.FromArgb(0x87, 0x88, 0xEE),
-        ["Warrior"]      = Color.FromArgb(0xC6, 0x9B, 0x3A),
+        ["DEATHKNIGHT"] = Color.FromArgb(0xC4, 0x1E, 0x3A),
+        ["DEMONHUNTER"] = Color.FromArgb(0xA3, 0x30, 0xC9),
+        ["DRUID"]       = Color.FromArgb(0xFF, 0x7C, 0x0A),
+        ["EVOKER"]      = Color.FromArgb(0x33, 0x93, 0x7F),
+        ["HUNTER"]      = Color.FromArgb(0xAA, 0xD3, 0x72),
+        ["MAGE"]        = Color.FromArgb(0x3F, 0xC7, 0xEB),
+        ["MONK"]        = Color.FromArgb(0x00, 0xFF, 0x98),
+        ["PALADIN"]     = Color.FromArgb(0xF4, 0x8C, 0xBA),
+        ["PRIEST"]      = Color.FromArgb(0xFF, 0xFF, 0xFF),
+        ["ROGUE"]       = Color.FromArgb(0xFF, 0xF4, 0x68),
+        ["SHAMAN"]      = Color.FromArgb(0x00, 0x70, 0xDD),
+        ["WARLOCK"]     = Color.FromArgb(0x87, 0x88, 0xEE),
+        ["WARRIOR"]     = Color.FromArgb(0xC6, 0x9B, 0x3A),
     };
 
     // Light mode overrides for classes whose canonical color is unreadable on a light background
     private static readonly Dictionary<string, Color> ClassColorsLight = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["Priest"] = Color.Black,
-        ["Rogue"]  = Color.FromArgb(0xB8, 0x86, 0x0B),
+        ["PRIEST"] = Color.Black,
+        ["ROGUE"]  = Color.FromArgb(0xB8, 0x86, 0x0B),
     };
 
-    // Stable ordered palettes used for deterministic fallback assignment
+    // Stable ordered palettes used for deterministic fallback assignment (no class data available)
     private static readonly Color[] ClassColorPaletteDark =
     [
-        Color.FromArgb(0xC4, 0x1E, 0x3A), // Death Knight
-        Color.FromArgb(0xA3, 0x30, 0xC9), // Demon Hunter
-        Color.FromArgb(0xFF, 0x7C, 0x0A), // Druid
-        Color.FromArgb(0x33, 0x93, 0x7F), // Evoker
-        Color.FromArgb(0xAA, 0xD3, 0x72), // Hunter
-        Color.FromArgb(0x3F, 0xC7, 0xEB), // Mage
-        Color.FromArgb(0x00, 0xFF, 0x98), // Monk
-        Color.FromArgb(0xF4, 0x8C, 0xBA), // Paladin
-        Color.FromArgb(0xF0, 0xEB, 0xE0), // Priest (white — readable on dark)
-        Color.FromArgb(0xFF, 0xF4, 0x68), // Rogue
-        Color.FromArgb(0x00, 0x70, 0xDD), // Shaman
-        Color.FromArgb(0x87, 0x88, 0xEE), // Warlock
-        Color.FromArgb(0xC6, 0x9B, 0x3A), // Warrior
+        Color.FromArgb(0xC4, 0x1E, 0x3A), // DEATHKNIGHT
+        Color.FromArgb(0xA3, 0x30, 0xC9), // DEMONHUNTER
+        Color.FromArgb(0xFF, 0x7C, 0x0A), // DRUID
+        Color.FromArgb(0x33, 0x93, 0x7F), // EVOKER
+        Color.FromArgb(0xAA, 0xD3, 0x72), // HUNTER
+        Color.FromArgb(0x3F, 0xC7, 0xEB), // MAGE
+        Color.FromArgb(0x00, 0xFF, 0x98), // MONK
+        Color.FromArgb(0xF4, 0x8C, 0xBA), // PALADIN
+        Color.FromArgb(0xFF, 0xFF, 0xFF), // PRIEST
+        Color.FromArgb(0xFF, 0xF4, 0x68), // ROGUE
+        Color.FromArgb(0x00, 0x70, 0xDD), // SHAMAN
+        Color.FromArgb(0x87, 0x88, 0xEE), // WARLOCK
+        Color.FromArgb(0xC6, 0x9B, 0x3A), // WARRIOR
     ];
 
     private static readonly Color[] ClassColorPaletteLight =
     [
-        Color.FromArgb(0xC4, 0x1E, 0x3A), // Death Knight
-        Color.FromArgb(0xA3, 0x30, 0xC9), // Demon Hunter
-        Color.FromArgb(0xFF, 0x7C, 0x0A), // Druid
-        Color.FromArgb(0x33, 0x93, 0x7F), // Evoker
-        Color.FromArgb(0xAA, 0xD3, 0x72), // Hunter
-        Color.FromArgb(0x3F, 0xC7, 0xEB), // Mage
-        Color.FromArgb(0x00, 0xFF, 0x98), // Monk
-        Color.FromArgb(0xF4, 0x8C, 0xBA), // Paladin
-        Color.Black,                       // Priest (white → black on light bg)
-        Color.FromArgb(0xB8, 0x86, 0x0B), // Rogue (yellow → dark goldenrod on light bg)
-        Color.FromArgb(0x00, 0x70, 0xDD), // Shaman
-        Color.FromArgb(0x87, 0x88, 0xEE), // Warlock
-        Color.FromArgb(0xC6, 0x9B, 0x3A), // Warrior
+        Color.FromArgb(0xC4, 0x1E, 0x3A), // DEATHKNIGHT
+        Color.FromArgb(0xA3, 0x30, 0xC9), // DEMONHUNTER
+        Color.FromArgb(0xFF, 0x7C, 0x0A), // DRUID
+        Color.FromArgb(0x33, 0x93, 0x7F), // EVOKER
+        Color.FromArgb(0xAA, 0xD3, 0x72), // HUNTER
+        Color.FromArgb(0x3F, 0xC7, 0xEB), // MAGE
+        Color.FromArgb(0x00, 0xFF, 0x98), // MONK
+        Color.FromArgb(0xF4, 0x8C, 0xBA), // PALADIN
+        Color.Black,                       // PRIEST  (white → black on light bg)
+        Color.FromArgb(0xB8, 0x86, 0x0B), // ROGUE   (yellow → dark goldenrod on light bg)
+        Color.FromArgb(0x00, 0x70, 0xDD), // SHAMAN
+        Color.FromArgb(0x87, 0x88, 0xEE), // WARLOCK
+        Color.FromArgb(0xC6, 0x9B, 0x3A), // WARRIOR
     ];
 
     /// <summary>
