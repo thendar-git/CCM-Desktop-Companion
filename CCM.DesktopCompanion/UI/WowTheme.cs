@@ -62,6 +62,7 @@ internal static class WowTheme
     private static readonly Dictionary<string, Color> ClassColorsLight = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Priest"] = Color.Black,
+        ["Rogue"]  = Color.FromArgb(0xB8, 0x86, 0x0B),
     };
 
     // Stable ordered palettes used for deterministic fallback assignment
@@ -93,7 +94,7 @@ internal static class WowTheme
         Color.FromArgb(0x00, 0xFF, 0x98), // Monk
         Color.FromArgb(0xF4, 0x8C, 0xBA), // Paladin
         Color.Black,                       // Priest (white → black on light bg)
-        Color.FromArgb(0xFF, 0xF4, 0x68), // Rogue
+        Color.FromArgb(0xB8, 0x86, 0x0B), // Rogue (yellow → dark goldenrod on light bg)
         Color.FromArgb(0x00, 0x70, 0xDD), // Shaman
         Color.FromArgb(0x87, 0x88, 0xEE), // Warlock
         Color.FromArgb(0xC6, 0x9B, 0x3A), // Warrior
