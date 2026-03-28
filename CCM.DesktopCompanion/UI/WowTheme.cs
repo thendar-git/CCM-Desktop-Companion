@@ -38,7 +38,7 @@ internal static class WowTheme
     public static readonly Color ReadyYes    = Color.FromArgb(0x1E, 0xFF, 0x00);
     public static readonly Color ReadyNo     = Color.FromArgb(0xFF, 0x44, 0x44);
 
-    // WoW class colors
+    // WoW class colors (dark mode)
     private static readonly Dictionary<string, Color> ClassColors = new(StringComparer.OrdinalIgnoreCase)
     {
         ["DeathKnight"]  = Color.FromArgb(0xC4, 0x1E, 0x3A),
@@ -56,6 +56,12 @@ internal static class WowTheme
         ["Shaman"]       = Color.FromArgb(0x00, 0x70, 0xDD),
         ["Warlock"]      = Color.FromArgb(0x87, 0x88, 0xEE),
         ["Warrior"]      = Color.FromArgb(0xC6, 0x9B, 0x3A),
+    };
+
+    // Light mode overrides for classes whose canonical color is unreadable on a light background
+    private static readonly Dictionary<string, Color> ClassColorsLight = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Priest"] = Color.Black,
     };
 
     // Stable ordered palette used for deterministic fallback assignment
@@ -80,12 +86,16 @@ internal static class WowTheme
     /// Returns a WoW class color for the character. If the class name is known it maps
     /// directly; otherwise a stable color is derived from the character key so every
     /// character still gets a distinct, consistent WoW-palette color.
+    /// In light mode, colors that are too bright to read are replaced with black.
     /// </summary>
     public static Color GetCharacterColor(string characterKey, string? className, bool dark)
     {
-        if (!string.IsNullOrWhiteSpace(className) && ClassColors.TryGetValue(className, out var classColor))
+        if (!string.IsNullOrWhiteSpace(className))
         {
-            return classColor;
+            if (!dark && ClassColorsLight.TryGetValue(className, out var lightOverride))
+                return lightOverride;
+            if (ClassColors.TryGetValue(className, out var classColor))
+                return classColor;
         }
 
         // Deterministic fallback: hash the character key to a palette slot
