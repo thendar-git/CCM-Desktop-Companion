@@ -58,13 +58,43 @@ internal static class WowTheme
         ["Warrior"]      = Color.FromArgb(0xC6, 0x9B, 0x3A),
     };
 
-    public static Color GetClassColor(string? className, bool dark)
+    // Stable ordered palette used for deterministic fallback assignment
+    private static readonly Color[] ClassColorPalette =
+    [
+        Color.FromArgb(0xC4, 0x1E, 0x3A), // Death Knight
+        Color.FromArgb(0xA3, 0x30, 0xC9), // Demon Hunter
+        Color.FromArgb(0xFF, 0x7C, 0x0A), // Druid
+        Color.FromArgb(0x33, 0x93, 0x7F), // Evoker
+        Color.FromArgb(0xAA, 0xD3, 0x72), // Hunter
+        Color.FromArgb(0x3F, 0xC7, 0xEB), // Mage
+        Color.FromArgb(0x00, 0xFF, 0x98), // Monk
+        Color.FromArgb(0xF4, 0x8C, 0xBA), // Paladin
+        Color.FromArgb(0xF0, 0xEB, 0xE0), // Priest
+        Color.FromArgb(0xFF, 0xF4, 0x68), // Rogue
+        Color.FromArgb(0x00, 0x70, 0xDD), // Shaman
+        Color.FromArgb(0x87, 0x88, 0xEE), // Warlock
+        Color.FromArgb(0xC6, 0x9B, 0x3A), // Warrior
+    ];
+
+    /// <summary>
+    /// Returns a WoW class color for the character. If the class name is known it maps
+    /// directly; otherwise a stable color is derived from the character key so every
+    /// character still gets a distinct, consistent WoW-palette color.
+    /// </summary>
+    public static Color GetCharacterColor(string characterKey, string? className, bool dark)
     {
-        if (!string.IsNullOrWhiteSpace(className) && ClassColors.TryGetValue(className, out var color))
+        if (!string.IsNullOrWhiteSpace(className) && ClassColors.TryGetValue(className, out var classColor))
         {
-            return color;
+            return classColor;
         }
-        return dark ? DarkText : LightText;
+
+        // Deterministic fallback: hash the character key to a palette slot
+        var hash = 0;
+        foreach (var ch in characterKey)
+        {
+            hash = hash * 31 + char.ToUpperInvariant(ch);
+        }
+        return ClassColorPalette[Math.Abs(hash) % ClassColorPalette.Length];
     }
 
     public static Color Background(bool dark) => dark ? DarkBackground  : LightBackground;

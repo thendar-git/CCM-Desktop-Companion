@@ -66,7 +66,9 @@ internal sealed class SummaryForm : Form
             Width = 34,
             Height = 30,
             Anchor = AnchorStyles.Right,
-            Font = new Font("Segoe UI Symbol", 15f),
+            Font = new Font("Segoe UI Symbol", 14f),
+            TextAlign = ContentAlignment.MiddleCenter,
+            UseCompatibleTextRendering = true,
             Padding = new Padding(0),
             Margin = new Padding(0, 1, 4, 1),
             Cursor = Cursors.Hand,
@@ -299,7 +301,7 @@ internal sealed class SummaryForm : Form
             if (_cooldownGrid.Rows[e.RowIndex].Tag is CooldownRecord cooldown)
             {
                 _characterClassByKey.TryGetValue(cooldown.CharacterKey, out var cls);
-                e.CellStyle.ForeColor = WowTheme.GetClassColor(cls, _isDarkMode);
+                e.CellStyle.ForeColor = WowTheme.GetCharacterColor(cooldown.CharacterKey, cls, _isDarkMode);
                 e.CellStyle.Font = new Font(_cooldownGrid.Font!, FontStyle.Bold);
             }
             return;
