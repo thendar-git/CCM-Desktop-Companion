@@ -106,7 +106,7 @@ internal sealed class CompanionApplicationContext : ApplicationContext
             return;
         }
 
-        var form = new SummaryForm
+        var form = new SummaryForm(_settings.DarkMode)
         {
             Icon = (Icon)_applicationIcon.Clone(),
             WindowState = _summaryRestoreWindowState,
@@ -134,6 +134,11 @@ internal sealed class CompanionApplicationContext : ApplicationContext
             _settingsService.Save(_settings);
             RebuildWatcher(GetSavedVariablesPath());
             RefreshSnapshot();
+        };
+        form.DarkModeChanged += dark =>
+        {
+            _settings.DarkMode = dark;
+            _settingsService.Save(_settings);
         };
         form.FormClosing += (_, args) =>
         {

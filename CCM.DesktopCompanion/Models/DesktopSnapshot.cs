@@ -22,6 +22,7 @@ internal sealed class CharacterRecord
     public string CharacterKey { get; set; } = string.Empty;
     public string CharacterName { get; set; } = string.Empty;
     public string RealmName { get; set; } = string.Empty;
+    public string Class { get; set; } = string.Empty;
     public List<string> Professions { get; } = [];
 }
 
@@ -71,6 +72,7 @@ internal sealed class DesktopCompanionSettings
     public bool ExpansionsInitialized { get; set; }
     public bool ItemsInitialized { get; set; }
     public string SavedVariablesFilePath { get; set; } = string.Empty;
+    public bool DarkMode { get; set; } = true;
     public string SortColumnName { get; set; } = "Ready";
     public bool SortAscending { get; set; } = true;
     public HashSet<string> SelectedCharacters { get; set; } = [];

@@ -8,107 +8,104 @@ namespace CCM.DesktopCompanion.UI;
 internal sealed class SummaryForm : Form
 {
     private readonly Label _summaryLabel;
-    private readonly TextBox _savedVariablesPathText;
-    private readonly Button _browseSavedVariablesButton;
+    private readonly Button _gearButton;
     private readonly CheckedListBox _characterFilter;
     private readonly CheckedListBox _professionFilter;
     private readonly CheckedListBox _expansionFilter;
     private readonly CheckedListBox _itemFilter;
     private readonly DataGridView _cooldownGrid;
+    private readonly ToolTip _toolTip = new();
+
     private List<CooldownRecord> _visibleCooldowns = [];
     private bool _isUpdatingFilters;
     private string _sortColumnName = "Ready";
     private bool _sortAscending = true;
+    private bool _isDarkMode = true;
+    private string _currentSavedVariablesPath = string.Empty;
+    private Dictionary<string, string> _characterClassByKey = new(StringComparer.OrdinalIgnoreCase);
 
     public event EventHandler? FiltersChanged;
     public event Action<CooldownRecord, bool>? NotificationEnabledChanged;
     public event Action<string, bool>? SortChanged;
     public event Action<string>? SavedVariablesPathChanged;
+    public event Action<bool>? DarkModeChanged;
 
-    public SummaryForm()
+    public SummaryForm(bool darkMode = true)
     {
+        _isDarkMode = darkMode;
+
         Text = "CCM Desktop Companion";
         Width = 1195;
         Height = 640;
         MinimumSize = new Size(1195, 640);
         StartPosition = FormStartPosition.CenterScreen;
 
+        // ── Top bar: summary label + gear icon ───────────────────────────
         var topBar = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 72,
-            ColumnCount = 1,
-            RowCount = 2,
-            Padding = new Padding(12, 0, 12, 0),
+            Height = 44,
+            ColumnCount = 2,
+            RowCount = 1,
+            Padding = new Padding(12, 6, 8, 6),
         };
         topBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        topBar.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
-        topBar.RowStyles.Add(new RowStyle(SizeType.Absolute, 40f));
+        topBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
         _summaryLabel = new Label
         {
             Dock = DockStyle.Fill,
-            Height = 32,
             TextAlign = ContentAlignment.MiddleLeft,
             Text = "Waiting for CCM desktop snapshot...",
-        };
-        topBar.Controls.Add(_summaryLabel, 0, 0);
-
-        var settingsBar = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 3,
-            RowCount = 1,
-            Margin = new Padding(0, 0, 0, 4),
-        };
-        settingsBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        settingsBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        settingsBar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-
-        var savedVariablesLabel = new Label
-        {
-            AutoSize = true,
-            Anchor = AnchorStyles.Left,
-            Text = "SavedVariables file:",
-            Margin = new Padding(0, 0, 8, 0),
+            Font = new Font("Segoe UI", 9.5f, FontStyle.Regular),
         };
 
-        _savedVariablesPathText = new TextBox
+        _gearButton = new Button
         {
-            Dock = DockStyle.Fill,
-            ReadOnly = true,
-            Margin = new Padding(0, 6, 8, 6),
-        };
-
-        _browseSavedVariablesButton = new Button
-        {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Text = "\u2699",
+            Width = 34,
+            Height = 30,
             Anchor = AnchorStyles.Right,
-            Text = "Browse...",
-            Margin = new Padding(0, 4, 0, 4),
+            Font = new Font("Segoe UI Symbol", 15f),
+            Padding = new Padding(0),
+            Margin = new Padding(0, 1, 4, 1),
+            Cursor = Cursors.Hand,
+            TabStop = false,
         };
-        _browseSavedVariablesButton.Click += (_, _) => BrowseForSavedVariablesPath();
+        _gearButton.Click += (_, _) => OpenSettings();
+        _toolTip.SetToolTip(_gearButton, "Settings");
 
-        settingsBar.Controls.Add(savedVariablesLabel, 0, 0);
-        settingsBar.Controls.Add(_savedVariablesPathText, 1, 0);
-        settingsBar.Controls.Add(_browseSavedVariablesButton, 2, 0);
-        topBar.Controls.Add(settingsBar, 0, 1);
+        topBar.Controls.Add(_summaryLabel, 0, 0);
+        topBar.Controls.Add(_gearButton, 1, 0);
 
+        // ── Gold separator ────────────────────────────────────────────────
+        var separator = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 2,
+            Tag = "separator",
+        };
+        separator.Paint += (_, e) =>
+        {
+            using var pen = new Pen(WowTheme.GoldDark, 1);
+            e.Graphics.DrawLine(pen, 0, 0, separator.Width, 0);
+            using var pen2 = new Pen(WowTheme.GoldMid, 1);
+            e.Graphics.DrawLine(pen2, 0, 1, separator.Width, 1);
+        };
+
+        // ── Filter panel ──────────────────────────────────────────────────
         var filterPanel = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 180,
+            Height = 175,
             ColumnCount = 4,
-            RowCount = 2,
-            Padding = new Padding(12, 8, 12, 8),
+            RowCount = 1,
+            Padding = new Padding(10, 6, 10, 6),
         };
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
         filterPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
-        filterPanel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        filterPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
         _characterFilter = BuildFilterList();
         _professionFilter = BuildFilterList();
@@ -119,11 +116,8 @@ internal sealed class SummaryForm : Form
         filterPanel.Controls.Add(BuildFilterGroup("Professions", _professionFilter), 1, 0);
         filterPanel.Controls.Add(BuildFilterGroup("Expansions", _expansionFilter), 2, 0);
         filterPanel.Controls.Add(BuildFilterGroup("Cooldown Items", _itemFilter), 3, 0);
-        filterPanel.SetRowSpan(filterPanel.Controls[0], 2);
-        filterPanel.SetRowSpan(filterPanel.Controls[1], 2);
-        filterPanel.SetRowSpan(filterPanel.Controls[2], 2);
-        filterPanel.SetRowSpan(filterPanel.Controls[3], 2);
 
+        // ── Cooldown grid ─────────────────────────────────────────────────
         _cooldownGrid = new DataGridView
         {
             Dock = DockStyle.Fill,
@@ -131,8 +125,8 @@ internal sealed class SummaryForm : Form
             AllowUserToDeleteRows = false,
             AllowUserToResizeRows = false,
             AutoGenerateColumns = false,
-            BackgroundColor = SystemColors.Window,
-            BorderStyle = BorderStyle.FixedSingle,
+            BorderStyle = BorderStyle.None,
+            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
             MultiSelect = false,
             ReadOnly = false,
             RowHeadersVisible = false,
@@ -148,11 +142,17 @@ internal sealed class SummaryForm : Form
             }
         };
         _cooldownGrid.ColumnHeaderMouseClick += CooldownGridOnColumnHeaderMouseClick;
+        _cooldownGrid.CellFormatting += CooldownGridOnCellFormatting;
 
         Controls.Add(_cooldownGrid);
         Controls.Add(filterPanel);
+        Controls.Add(separator);
         Controls.Add(topBar);
+
+        ApplyTheme(_isDarkMode);
     }
+
+    // ── Public API ────────────────────────────────────────────────────────
 
     public void SetFilterOptions(IReadOnlyList<string> characters, IReadOnlyList<string> professions, IReadOnlyList<string> expansions, IReadOnlyList<string> items, DesktopCompanionSettings settings)
     {
@@ -175,6 +175,11 @@ internal sealed class SummaryForm : Form
 
     public void UpdateSnapshot(DesktopSnapshot snapshot, IReadOnlyList<CooldownRecord> visibleCooldowns, DesktopCompanionSettings settings)
     {
+        // Rebuild class lookup
+        _characterClassByKey = snapshot.Characters
+            .Where(c => !string.IsNullOrWhiteSpace(c.Class))
+            .ToDictionary(c => c.CharacterKey, c => c.Class, StringComparer.OrdinalIgnoreCase);
+
         EnsureGridColumns();
         _visibleCooldowns = SortCooldowns(visibleCooldowns).ToList();
         _cooldownGrid.SuspendLayout();
@@ -183,7 +188,7 @@ internal sealed class SummaryForm : Form
         var generatedText = snapshot.GeneratedAt > 0
             ? DateTimeOffset.FromUnixTimeSeconds(snapshot.GeneratedAt).ToLocalTime().ToString("g")
             : "n/a";
-        _summaryLabel.Text = $"Snapshot v{snapshot.SchemaVersion} | Generated: {generatedText} | Visible: {_visibleCooldowns.Count} | Ready: {snapshot.GetReadyCooldownCount(_visibleCooldowns)}";
+        _summaryLabel.Text = $"Snapshot v{snapshot.SchemaVersion}  \u2502  Generated: {generatedText}  \u2502  Visible: {_visibleCooldowns.Count}  \u2502  Ready: {snapshot.GetReadyCooldownCount(_visibleCooldowns)}";
 
         foreach (var cooldown in _visibleCooldowns)
         {
@@ -206,9 +211,14 @@ internal sealed class SummaryForm : Form
 
     public void SetSavedVariablesPath(string path)
     {
-        _savedVariablesPathText.Text = string.IsNullOrWhiteSpace(path)
-            ? "Browse to CCM.lua"
-            : path;
+        _currentSavedVariablesPath = path;
+    }
+
+    public void SetTheme(bool darkMode)
+    {
+        if (_isDarkMode == darkMode) return;
+        _isDarkMode = darkMode;
+        ApplyTheme(darkMode);
     }
 
     public HashSet<string> GetSelectedCharacters() => GetSelectedValues(_characterFilter);
@@ -216,7 +226,104 @@ internal sealed class SummaryForm : Form
     public HashSet<string> GetSelectedExpansions() => GetSelectedValues(_expansionFilter);
     public HashSet<string> GetSelectedItems() => GetSelectedValues(_itemFilter);
 
-    private static CheckedListBox BuildFilterList()
+    // ── Theme ─────────────────────────────────────────────────────────────
+
+    private void ApplyTheme(bool dark)
+    {
+        BackColor = WowTheme.Background(dark);
+        ForeColor = WowTheme.Text(dark);
+        WowTheme.StyleGearButton(_gearButton, dark);
+        _summaryLabel.ForeColor = dark ? WowTheme.GoldBright : WowTheme.LightText;
+        _summaryLabel.BackColor = Color.Transparent;
+        WowTheme.ApplyToForm(this, dark);
+        WowTheme.ApplyToDataGridView(_cooldownGrid, dark);
+        _cooldownGrid.Invalidate();
+    }
+
+    // ── Settings dialog ───────────────────────────────────────────────────
+
+    private void OpenSettings()
+    {
+        using var dlg = new SettingsForm(_currentSavedVariablesPath, _isDarkMode)
+        {
+            Icon = Icon,
+        };
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        if (!string.Equals(dlg.SavedVariablesPath, _currentSavedVariablesPath, StringComparison.Ordinal))
+        {
+            _currentSavedVariablesPath = dlg.SavedVariablesPath;
+            SavedVariablesPathChanged?.Invoke(_currentSavedVariablesPath);
+        }
+
+        if (dlg.DarkMode != _isDarkMode)
+        {
+            _isDarkMode = dlg.DarkMode;
+            ApplyTheme(_isDarkMode);
+            DarkModeChanged?.Invoke(_isDarkMode);
+        }
+    }
+
+    // ── Grid setup ────────────────────────────────────────────────────────
+
+    private void EnsureGridColumns()
+    {
+        if (_cooldownGrid.Columns.Count > 0) return;
+
+        _cooldownGrid.Columns.Add(new DataGridViewCheckBoxColumn
+        {
+            Name = "Notify",
+            HeaderText = "Notify",
+            Width = 55,
+            DataPropertyName = "Notify",
+            SortMode = DataGridViewColumnSortMode.Programmatic,
+        });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Character",     HeaderText = "Character",     Width = 160, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Profession",    HeaderText = "Profession",    Width = 120, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Expansion",     HeaderText = "Expansion",     Width = 150, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "ItemName",      HeaderText = "Cooldown Item", Width = 320, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Ready",         HeaderText = "READY",         Width = 60,  ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Charges",       HeaderText = "Charges",       Width = 70,  ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "NextCharge",    HeaderText = "Next Charge",   Width = 110, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Concentration", HeaderText = "Concentration", Width = 110, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
+    }
+
+    private void CooldownGridOnCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (e.RowIndex < 0) return;
+
+        // Character column — WoW class color
+        if (e.ColumnIndex == 1 && e.CellStyle != null)
+        {
+            if (_cooldownGrid.Rows[e.RowIndex].Tag is CooldownRecord cooldown)
+            {
+                _characterClassByKey.TryGetValue(cooldown.CharacterKey, out var cls);
+                e.CellStyle.ForeColor = WowTheme.GetClassColor(cls, _isDarkMode);
+                e.CellStyle.Font = new Font(_cooldownGrid.Font!, FontStyle.Bold);
+            }
+            return;
+        }
+
+        // READY column — green / red
+        if (e.ColumnIndex == 5 && e.CellStyle != null)
+        {
+            var val = e.Value?.ToString();
+            if (val == "YES")
+            {
+                e.CellStyle.ForeColor = WowTheme.ReadyYes;
+                e.CellStyle.Font = new Font(_cooldownGrid.Font!, FontStyle.Bold);
+            }
+            else if (val == "NO")
+            {
+                e.CellStyle.ForeColor = WowTheme.ReadyNo;
+            }
+        }
+    }
+
+    // ── Filter helpers ────────────────────────────────────────────────────
+
+    private CheckedListBox BuildFilterList()
     {
         return new CheckedListBox
         {
@@ -227,52 +334,26 @@ internal sealed class SummaryForm : Form
         };
     }
 
-    private void EnsureGridColumns()
-    {
-        if (_cooldownGrid.Columns.Count > 0)
-        {
-            return;
-        }
-
-        _cooldownGrid.Columns.Add(new DataGridViewCheckBoxColumn
-        {
-            Name = "Notify",
-            HeaderText = "Notify",
-            Width = 55,
-            DataPropertyName = "Notify",
-            SortMode = DataGridViewColumnSortMode.Programmatic,
-        });
-        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Character", HeaderText = "Character", Width = 160, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
-        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Profession", HeaderText = "Profession", Width = 120, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
-        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Expansion", HeaderText = "Expansion", Width = 150, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
-        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "ItemName", HeaderText = "Cooldown Item", Width = 320, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
-        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Ready", HeaderText = "READY", Width = 60, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
-        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Charges", HeaderText = "Charges", Width = 70, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
-        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "NextCharge", HeaderText = "Next Charge", Width = 110, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
-        _cooldownGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = "Concentration", HeaderText = "Concentration", Width = 110, ReadOnly = true, SortMode = DataGridViewColumnSortMode.Programmatic });
-    }
-
     private GroupBox BuildFilterGroup(string title, CheckedListBox list)
     {
         var group = new GroupBox
         {
             Text = title,
             Dock = DockStyle.Fill,
-            Padding = new Padding(8),
+            Padding = new Padding(6),
         };
 
         var buttonPanel = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 32,
+            Height = 30,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
         };
 
-        var allButton = new Button { Text = "All", Width = 54, Height = 24 };
-        allButton.Click += (_, _) => SetAllItems(list, true);
-
-        var noneButton = new Button { Text = "None", Width = 54, Height = 24 };
+        var allButton  = new Button { Text = "All",  Width = 52, Height = 24, Margin = new Padding(0, 2, 4, 2) };
+        var noneButton = new Button { Text = "None", Width = 52, Height = 24, Margin = new Padding(0, 2, 0, 2) };
+        allButton.Click  += (_, _) => SetAllItems(list, true);
         noneButton.Click += (_, _) => SetAllItems(list, false);
 
         buttonPanel.Controls.Add(allButton);
@@ -282,51 +363,11 @@ internal sealed class SummaryForm : Form
 
         list.ItemCheck += (_, _) =>
         {
-            if (_isUpdatingFilters)
-            {
-                return;
-            }
-
+            if (_isUpdatingFilters) return;
             BeginInvoke(new Action(() => FiltersChanged?.Invoke(this, EventArgs.Empty)));
         };
 
         return group;
-    }
-
-    private void CooldownGridOnCellValueChanged(object? sender, DataGridViewCellEventArgs e)
-    {
-        if (e.RowIndex < 0 || e.ColumnIndex != 0)
-        {
-            return;
-        }
-
-        if (_cooldownGrid.Rows[e.RowIndex].Tag is CooldownRecord cooldown)
-        {
-            var enabled = Convert.ToBoolean(_cooldownGrid.Rows[e.RowIndex].Cells[0].Value ?? false);
-            NotificationEnabledChanged?.Invoke(cooldown, enabled);
-        }
-    }
-
-    private void CooldownGridOnColumnHeaderMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
-    {
-        var column = _cooldownGrid.Columns[e.ColumnIndex];
-        if (column == null)
-        {
-            return;
-        }
-
-        if (string.Equals(_sortColumnName, column.Name, StringComparison.Ordinal))
-        {
-            _sortAscending = !_sortAscending;
-        }
-        else
-        {
-            _sortColumnName = column.Name;
-            _sortAscending = true;
-        }
-
-        SortChanged?.Invoke(_sortColumnName, _sortAscending);
-        FiltersChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void ApplyFilterItems(CheckedListBox list, IReadOnlyList<string> values, HashSet<string> selectedValues)
@@ -344,15 +385,12 @@ internal sealed class SummaryForm : Form
         try
         {
             for (var i = 0; i < list.Items.Count; i++)
-            {
                 list.SetItemChecked(i, isChecked);
-            }
         }
         finally
         {
             _isUpdatingFilters = false;
         }
-
         FiltersChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -364,50 +402,38 @@ internal sealed class SummaryForm : Form
             .ToHashSet(StringComparer.Ordinal);
     }
 
-    private void BrowseForSavedVariablesPath()
-    {
-        using var dialog = new OpenFileDialog
-        {
-            Title = "Select CCM.lua SavedVariables file",
-            Filter = "CCM SavedVariables (CCM.lua)|CCM.lua|Lua files (*.lua)|*.lua|All files (*.*)|*.*",
-            CheckFileExists = true,
-            Multiselect = false,
-        };
+    // ── Grid events ───────────────────────────────────────────────────────
 
-        var currentPath = _savedVariablesPathText.Text;
-        if (!string.IsNullOrWhiteSpace(currentPath) && !string.Equals(currentPath, "Browse to CCM.lua", StringComparison.Ordinal))
+    private void CooldownGridOnCellValueChanged(object? sender, DataGridViewCellEventArgs e)
+    {
+        if (e.RowIndex < 0 || e.ColumnIndex != 0) return;
+        if (_cooldownGrid.Rows[e.RowIndex].Tag is CooldownRecord cooldown)
         {
-            try
-            {
-                var initialDirectory = Path.GetDirectoryName(currentPath);
-                if (!string.IsNullOrWhiteSpace(initialDirectory) && Directory.Exists(initialDirectory))
-                {
-                    dialog.InitialDirectory = initialDirectory;
-                }
-                var fileName = Path.GetFileName(currentPath);
-                if (!string.IsNullOrWhiteSpace(fileName))
-                {
-                    dialog.FileName = fileName;
-                }
-            }
-            catch
-            {
-                // Ignore malformed path values in the UI field.
-            }
+            var enabled = Convert.ToBoolean(_cooldownGrid.Rows[e.RowIndex].Cells[0].Value ?? false);
+            NotificationEnabledChanged?.Invoke(cooldown, enabled);
+        }
+    }
+
+    private void CooldownGridOnColumnHeaderMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+    {
+        var column = _cooldownGrid.Columns[e.ColumnIndex];
+        if (column == null) return;
+
+        if (string.Equals(_sortColumnName, column.Name, StringComparison.Ordinal))
+        {
+            _sortAscending = !_sortAscending;
         }
         else
         {
-            dialog.FileName = "CCM.lua";
+            _sortColumnName = column.Name;
+            _sortAscending = true;
         }
 
-        if (dialog.ShowDialog(this) != DialogResult.OK)
-        {
-            return;
-        }
-
-        SetSavedVariablesPath(dialog.FileName);
-        SavedVariablesPathChanged?.Invoke(dialog.FileName);
+        SortChanged?.Invoke(_sortColumnName, _sortAscending);
+        FiltersChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    // ── Sort ──────────────────────────────────────────────────────────────
 
     private IEnumerable<CooldownRecord> SortCooldowns(IReadOnlyList<CooldownRecord> visibleCooldowns)
     {
@@ -415,28 +441,28 @@ internal sealed class SummaryForm : Form
         {
             return _sortAscending
                 ? visibleCooldowns
-                    .OrderByDescending(cooldown => cooldown.ReadyChargesNow > 0)
-                    .ThenBy(cooldown => cooldown.NextChargeRemainingSeconds ?? int.MaxValue)
-                    .ThenBy(cooldown => cooldown.GetCharacterDisplayName(), StringComparer.OrdinalIgnoreCase)
+                    .OrderByDescending(c => c.ReadyChargesNow > 0)
+                    .ThenBy(c => c.NextChargeRemainingSeconds ?? int.MaxValue)
+                    .ThenBy(c => c.GetCharacterDisplayName(), StringComparer.OrdinalIgnoreCase)
                 : visibleCooldowns
-                    .OrderBy(cooldown => cooldown.ReadyChargesNow > 0)
-                    .ThenByDescending(cooldown => cooldown.NextChargeRemainingSeconds ?? int.MinValue)
-                    .ThenBy(cooldown => cooldown.GetCharacterDisplayName(), StringComparer.OrdinalIgnoreCase);
+                    .OrderBy(c => c.ReadyChargesNow > 0)
+                    .ThenByDescending(c => c.NextChargeRemainingSeconds ?? int.MinValue)
+                    .ThenBy(c => c.GetCharacterDisplayName(), StringComparer.OrdinalIgnoreCase);
         }
 
         Func<CooldownRecord, object?> keySelector = _sortColumnName switch
         {
-            "Notify" => cooldown => cooldown.Enabled,
-            "Character" => cooldown => cooldown.GetCharacterDisplayName(),
-            "Profession" => cooldown => cooldown.Profession,
-            "Expansion" => cooldown => string.IsNullOrWhiteSpace(cooldown.Expansion) ? "Unknown" : cooldown.Expansion,
-            "ItemName" => cooldown => cooldown.ItemName,
-            "Charges" => cooldown => (cooldown.MaxCharges.HasValue && cooldown.MaxCharges.Value > 0)
-                ? (double)cooldown.ReadyChargesNow / cooldown.MaxCharges.Value
-                : cooldown.ReadyChargesNow,
-            "NextCharge" => cooldown => cooldown.NextChargeRemainingSeconds ?? int.MaxValue,
-            "Concentration" => cooldown => cooldown.ConcentrationSimulated ?? -1,
-            _ => cooldown => cooldown.GetCharacterDisplayName(),
+            "Notify"        => c => c.Enabled,
+            "Character"     => c => c.GetCharacterDisplayName(),
+            "Profession"    => c => c.Profession,
+            "Expansion"     => c => string.IsNullOrWhiteSpace(c.Expansion) ? "Unknown" : c.Expansion,
+            "ItemName"      => c => c.ItemName,
+            "Charges"       => c => (c.MaxCharges.HasValue && c.MaxCharges.Value > 0)
+                                        ? (double)c.ReadyChargesNow / c.MaxCharges.Value
+                                        : c.ReadyChargesNow,
+            "NextCharge"    => c => c.NextChargeRemainingSeconds ?? int.MaxValue,
+            "Concentration" => c => c.ConcentrationSimulated ?? -1,
+            _               => c => c.GetCharacterDisplayName(),
         };
 
         return _sortAscending
@@ -447,50 +473,37 @@ internal sealed class SummaryForm : Form
     private void UpdateSortGlyphs()
     {
         foreach (DataGridViewColumn column in _cooldownGrid.Columns)
-        {
             column.HeaderCell.SortGlyphDirection = SortOrder.None;
-        }
 
         if (_cooldownGrid.Columns.Contains(_sortColumnName))
-        {
             _cooldownGrid.Columns[_sortColumnName].HeaderCell.SortGlyphDirection = _sortAscending ? SortOrder.Ascending : SortOrder.Descending;
-        }
     }
 
-    private static string FormatCharges(CooldownRecord cooldown)
-    {
-        var max = cooldown.MaxCharges;
-        if (max.HasValue && max.Value > 0)
-        {
-            return $"{cooldown.ReadyChargesNow} / {max.Value}";
-        }
+    // ── Formatters ────────────────────────────────────────────────────────
 
-        return cooldown.ReadyChargesNow.ToString();
+    private static string FormatCharges(CooldownRecord c)
+    {
+        var max = c.MaxCharges;
+        return max.HasValue && max.Value > 0
+            ? $"{c.ReadyChargesNow} / {max.Value}"
+            : c.ReadyChargesNow.ToString();
     }
 
-    private static string FormatConcentration(CooldownRecord cooldown)
+    private static string FormatConcentration(CooldownRecord c)
     {
-        if (cooldown.ConcentrationSimulated == null || cooldown.ConcentrationMaximum == null)
-        {
+        if (c.ConcentrationSimulated == null || c.ConcentrationMaximum == null)
             return string.Empty;
-        }
-
-        return $"{cooldown.ConcentrationSimulated} / {cooldown.ConcentrationMaximum}";
+        return $"{c.ConcentrationSimulated} / {c.ConcentrationMaximum}";
     }
 
-    private static string FormatReady(CooldownRecord cooldown)
-    {
-        return cooldown.ReadyChargesNow > 0 ? "YES" : "NO";
-    }
+    private static string FormatReady(CooldownRecord c)
+        => c.ReadyChargesNow > 0 ? "YES" : "NO";
 
-    private static string FormatNextCharge(CooldownRecord cooldown)
+    private static string FormatNextCharge(CooldownRecord c)
     {
-        if (cooldown.NextChargeRemainingSeconds == null)
-        {
-            return cooldown.ReadyChargesNow > 0 ? "\u2014" : "n/a";
-        }
-
-        return FormatDuration(cooldown.NextChargeRemainingSeconds.Value);
+        if (c.NextChargeRemainingSeconds == null)
+            return c.ReadyChargesNow > 0 ? "\u2014" : "n/a";
+        return FormatDuration(c.NextChargeRemainingSeconds.Value);
     }
 
     private static string FormatDuration(int totalSeconds)
@@ -498,13 +511,6 @@ internal sealed class SummaryForm : Form
         var remaining = Math.Max(0, totalSeconds);
         var hours = remaining / 3600;
         var minutes = (remaining % 3600) / 60;
-        if (hours <= 0)
-        {
-            return $"{minutes}m";
-        }
-
-        return $"{hours}h {minutes}m";
+        return hours <= 0 ? $"{minutes}m" : $"{hours}h {minutes}m";
     }
 }
-
-
