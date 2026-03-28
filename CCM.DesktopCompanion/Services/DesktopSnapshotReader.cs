@@ -129,6 +129,8 @@ internal sealed class DesktopSnapshotReader
             snapshot = MapSnapshot(nestedSnapshot, filePath);
             // Enrich snapshot cooldowns with fresh charge and concentration data from CCM_DB.cooldowns
             EnrichFromMainCooldowns(snapshot, dbTable.GetTable("cooldowns"));
+            // Enrich snapshot characters with classFile from CCM_DB.characters
+            EnrichCharactersFromDb(snapshot, dbTable.GetTable("characters"));
             return true;
         }
 
@@ -276,6 +278,27 @@ internal sealed class DesktopSnapshotReader
         }
 
         return snapshot;
+    }
+
+    private static void EnrichCharactersFromDb(DesktopSnapshot snapshot, LuaTable? dbCharactersTable)
+    {
+        if (dbCharactersTable == null)
+        {
+            return;
+        }
+
+        // CCM_DB.characters is keyed by characterKey, e.g. ["Cimblene-Eitrigg"] = { classFile = "MAGE", ... }
+        foreach (var character in snapshot.Characters)
+        {
+            if (dbCharactersTable.Fields.TryGetValue(character.CharacterKey, out var entry) && entry is LuaTable charTable)
+            {
+                var classFile = charTable.GetString("classFile");
+                if (!string.IsNullOrWhiteSpace(classFile))
+                {
+                    character.Class = classFile;
+                }
+            }
+        }
     }
 
     private static void EnrichFromMainCooldowns(DesktopSnapshot snapshot, LuaTable? mainCooldownsTable)
