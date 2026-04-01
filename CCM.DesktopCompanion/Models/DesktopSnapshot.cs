@@ -47,6 +47,8 @@ internal sealed class CooldownRecord
     public int? ConcentrationMaximum { get; set; }
     public long? ConcentrationScanTime { get; set; }
 
+    public bool IsConcentrationOnly { get; set; }
+
     public int ReadyChargesNow { get; set; }
     public int? NextChargeRemainingSeconds { get; set; }
     public int? ConcentrationSimulated { get; set; }

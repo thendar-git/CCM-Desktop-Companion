@@ -194,16 +194,33 @@ internal sealed class SummaryForm : Form
 
         foreach (var cooldown in _visibleCooldowns)
         {
-            _cooldownGrid.Rows.Add(
-                settings.IsNotificationEnabled(cooldown),
-                cooldown.GetCharacterDisplayName(),
-                cooldown.Profession,
-                string.IsNullOrWhiteSpace(cooldown.Expansion) ? "Unknown" : cooldown.Expansion,
-                cooldown.ItemName,
-                FormatReady(cooldown),
-                FormatCharges(cooldown),
-                FormatNextCharge(cooldown),
-                FormatConcentration(cooldown));
+            if (cooldown.IsConcentrationOnly)
+            {
+                _cooldownGrid.Rows.Add(
+                    false,
+                    cooldown.GetCharacterDisplayName(),
+                    cooldown.Profession,
+                    "\u2014",
+                    "\u2014",
+                    "\u2014",
+                    "\u2014",
+                    "\u2014",
+                    FormatConcentration(cooldown));
+                _cooldownGrid.Rows[^1].Cells[0].ReadOnly = true;
+            }
+            else
+            {
+                _cooldownGrid.Rows.Add(
+                    settings.IsNotificationEnabled(cooldown),
+                    cooldown.GetCharacterDisplayName(),
+                    cooldown.Profession,
+                    string.IsNullOrWhiteSpace(cooldown.Expansion) ? "Unknown" : cooldown.Expansion,
+                    cooldown.ItemName,
+                    FormatReady(cooldown),
+                    FormatCharges(cooldown),
+                    FormatNextCharge(cooldown),
+                    FormatConcentration(cooldown));
+            }
             _cooldownGrid.Rows[^1].Tag = cooldown;
         }
 
@@ -409,7 +426,7 @@ internal sealed class SummaryForm : Form
     private void CooldownGridOnCellValueChanged(object? sender, DataGridViewCellEventArgs e)
     {
         if (e.RowIndex < 0 || e.ColumnIndex != 0) return;
-        if (_cooldownGrid.Rows[e.RowIndex].Tag is CooldownRecord cooldown)
+        if (_cooldownGrid.Rows[e.RowIndex].Tag is CooldownRecord cooldown && !cooldown.IsConcentrationOnly)
         {
             var enabled = Convert.ToBoolean(_cooldownGrid.Rows[e.RowIndex].Cells[0].Value ?? false);
             NotificationEnabledChanged?.Invoke(cooldown, enabled);

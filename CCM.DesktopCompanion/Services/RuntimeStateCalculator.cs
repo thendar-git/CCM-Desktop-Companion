@@ -10,9 +10,12 @@ internal sealed class RuntimeStateCalculator
     {
         foreach (var cooldown in snapshot.Cooldowns)
         {
-            var (readyCharges, nextRemaining) = GetChargeRuntimeState(cooldown, nowUnix);
-            cooldown.ReadyChargesNow = readyCharges;
-            cooldown.NextChargeRemainingSeconds = nextRemaining;
+            if (!cooldown.IsConcentrationOnly)
+            {
+                var (readyCharges, nextRemaining) = GetChargeRuntimeState(cooldown, nowUnix);
+                cooldown.ReadyChargesNow = readyCharges;
+                cooldown.NextChargeRemainingSeconds = nextRemaining;
+            }
             cooldown.ConcentrationSimulated = GetConcentrationSimulated(cooldown, nowUnix);
         }
 
