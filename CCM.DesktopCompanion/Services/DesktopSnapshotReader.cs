@@ -200,25 +200,7 @@ internal sealed class DesktopSnapshotReader
                     ConcentrationCurrent = entry.GetNullableInt("concentrationCurrent"),
                     ConcentrationMaximum = entry.GetNullableInt("concentrationMaximum"),
                     ConcentrationScanTime = entry.GetNullableLong("concentrationScanTime"),
-                });
-            }
-        }
-
-        var charProfConcTable = table.GetTable("charProfConc");
-        if (charProfConcTable != null)
-        {
-            foreach (var entry in charProfConcTable.ArrayValues.OfType<LuaTable>())
-            {
-                snapshot.Cooldowns.Add(new CooldownRecord
-                {
-                    CharacterKey = entry.GetString("characterKey"),
-                    CharacterName = entry.GetString("characterName"),
-                    RealmName = entry.GetString("realmName"),
-                    Profession = entry.GetString("profession"),
-                    ConcentrationCurrent = entry.GetNullableInt("concentrationCurrent"),
-                    ConcentrationMaximum = entry.GetNullableInt("concentrationMaximum"),
-                    ConcentrationScanTime = entry.GetNullableLong("concentrationScanTime"),
-                    IsConcentrationOnly = true,
+                    IsConcentrationOnly = entry.GetBool("isConcentrationOnly"),
                 });
             }
         }
