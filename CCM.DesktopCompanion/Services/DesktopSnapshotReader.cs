@@ -131,6 +131,10 @@ internal sealed class DesktopSnapshotReader
             EnrichFromMainCooldowns(snapshot, dbTable.GetTable("cooldowns"));
             // Enrich snapshot characters with classFile from CCM_DB.characters
             EnrichCharactersFromDb(snapshot, dbTable.GetTable("characters"));
+            // Add concentration-only rows for character+profession combos with no cooldown entries.
+            // The addon generates these dynamically in-memory for its own UI but never writes them
+            // to CCM_DB, so the Desktop Companion must synthesize them from CCM_DB.characters.
+            AddConcentrationOnlyRows(snapshot, dbTable.GetTable("characters"), dbTable.GetTable("cooldowns"));
             return true;
         }
 
@@ -281,6 +285,96 @@ internal sealed class DesktopSnapshotReader
         return snapshot;
     }
 
+    private static void AddConcentrationOnlyRows(DesktopSnapshot snapshot, LuaTable? dbCharactersTable, LuaTable? dbCooldownsTable)
+    {
+        if (dbCharactersTable == null)
+        {
+            return;
+        }
+
+        // Build the set of character+profession combos already covered by at least one cooldown entry.
+        var coveredCombos = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var cooldown in snapshot.Cooldowns)
+        {
+            if (!string.IsNullOrWhiteSpace(cooldown.CharacterKey) && !string.IsNullOrWhiteSpace(cooldown.Profession))
+            {
+                coveredCombos.Add($"{cooldown.CharacterKey}\t{cooldown.Profession}");
+            }
+        }
+
+        // Build a per-combo concentration lookup from CCM_DB.cooldowns (first entry wins).
+        var concentrationByCombo = new Dictionary<string, (int? Current, int? Maximum, long? ScanTime)>(StringComparer.Ordinal);
+        if (dbCooldownsTable != null)
+        {
+            foreach (var entry in dbCooldownsTable.ArrayValues.OfType<LuaTable>())
+            {
+                var charKey = entry.GetString("characterKey");
+                var profession = entry.GetString("profession");
+                if (string.IsNullOrWhiteSpace(charKey) || string.IsNullOrWhiteSpace(profession))
+                {
+                    continue;
+                }
+                var combo = $"{charKey}\t{profession}";
+                if (!concentrationByCombo.ContainsKey(combo))
+                {
+                    concentrationByCombo[combo] = (
+                        entry.GetNullableInt("concentrationCurrent"),
+                        entry.GetNullableInt("concentrationMaximum"),
+                        entry.GetNullableLong("concentrationScanTime")
+                    );
+                }
+            }
+        }
+
+        // For each character+profession in CCM_DB.characters not covered by any cooldown, add a
+        // concentration-only row so the profession appears in the Desktop Companion grid.
+        foreach (var pair in dbCharactersTable.Fields)
+        {
+            if (pair.Value is not LuaTable charEntry)
+            {
+                continue;
+            }
+
+            var characterKey = pair.Key;
+            var characterName = charEntry.GetString("name");
+            var realmName = charEntry.GetString("realm");
+            var professionsTable = charEntry.GetTable("professions");
+            if (professionsTable == null)
+            {
+                continue;
+            }
+
+            foreach (var profPair in professionsTable.Fields)
+            {
+                if (profPair.Value is not bool isKnown || !isKnown)
+                {
+                    continue;
+                }
+
+                var profession = profPair.Key;
+                var combo = $"{characterKey}\t{profession}";
+                if (coveredCombos.Contains(combo))
+                {
+                    continue;
+                }
+
+                concentrationByCombo.TryGetValue(combo, out var conc);
+                snapshot.Cooldowns.Add(new CooldownRecord
+                {
+                    CharacterKey = characterKey,
+                    CharacterName = characterName,
+                    RealmName = realmName,
+                    Profession = profession,
+                    IsConcentrationOnly = true,
+                    Enabled = true,
+                    ConcentrationCurrent = conc.Current,
+                    ConcentrationMaximum = conc.Maximum,
+                    ConcentrationScanTime = conc.ScanTime,
+                });
+            }
+        }
+    }
+
     private static void EnrichCharactersFromDb(DesktopSnapshot snapshot, LuaTable? dbCharactersTable)
     {
         if (dbCharactersTable == null)
@@ -320,6 +414,11 @@ internal sealed class DesktopSnapshotReader
         }
 
         var byKey = new Dictionary<string, LuaTable>(StringComparer.Ordinal);
+        // First concentration entry per char+profession combo, used as a fallback for snapshot
+        // entries whose recipeId no longer exists in CCM_DB (e.g. stale snapshot with old recipes).
+        // Concentration is a per-profession pool shared by all recipes, so any entry from the same
+        // char+profession is valid.
+        var concentrationFallbackByCharProf = new Dictionary<string, (int? Current, int? Maximum, long? ScanTime)>(StringComparer.Ordinal);
         foreach (var entry in mainCooldownsTable.ArrayValues.OfType<LuaTable>())
         {
             var recipeId = entry.GetNullableLong("recipeID");
@@ -327,6 +426,19 @@ internal sealed class DesktopSnapshotReader
             if (recipeId.HasValue && !string.IsNullOrWhiteSpace(charKey))
             {
                 byKey[$"{charKey}|{recipeId}"] = entry;
+            }
+            if (!string.IsNullOrWhiteSpace(charKey))
+            {
+                var profession = entry.GetString("profession");
+                var concKey = $"{charKey}\t{profession}";
+                if (!concentrationFallbackByCharProf.ContainsKey(concKey))
+                {
+                    concentrationFallbackByCharProf[concKey] = (
+                        entry.GetNullableInt("concentrationCurrent"),
+                        entry.GetNullableInt("concentrationMaximum"),
+                        entry.GetNullableLong("concentrationScanTime")
+                    );
+                }
             }
         }
 
@@ -339,35 +451,47 @@ internal sealed class DesktopSnapshotReader
             }
 
             var key = $"{cooldown.CharacterKey}|{cooldown.RecipeId}";
-            if (!byKey.TryGetValue(key, out var main))
+            if (byKey.TryGetValue(key, out var main))
             {
-                continue;
-            }
+                // Exact match: update concentration and live charge/timing data.
+                cooldown.ConcentrationCurrent = main.GetNullableInt("concentrationCurrent");
+                cooldown.ConcentrationMaximum = main.GetNullableInt("concentrationMaximum");
+                cooldown.ConcentrationScanTime = main.GetNullableLong("concentrationScanTime");
 
-            cooldown.ConcentrationCurrent = main.GetNullableInt("concentrationCurrent");
-            cooldown.ConcentrationMaximum = main.GetNullableInt("concentrationMaximum");
-            cooldown.ConcentrationScanTime = main.GetNullableLong("concentrationScanTime");
+                var mainCurrentCharges = main.GetNullableInt("currentCharges");
+                var mainMaxCharges = main.GetNullableInt("maxCharges");
+                var mainReadyTime = main.GetLong("readyTime");
+                var mainDuration = main.GetInt("durationSeconds");
 
-            var mainCurrentCharges = main.GetNullableInt("currentCharges");
-            var mainMaxCharges = main.GetNullableInt("maxCharges");
-            var mainReadyTime = main.GetLong("readyTime");
-            var mainDuration = main.GetInt("durationSeconds");
-
-            if (mainCurrentCharges.HasValue)
-            {
-                cooldown.CurrentCharges = mainCurrentCharges;
+                if (mainCurrentCharges.HasValue)
+                {
+                    cooldown.CurrentCharges = mainCurrentCharges;
+                }
+                if (mainMaxCharges.HasValue)
+                {
+                    cooldown.MaxCharges = mainMaxCharges;
+                }
+                if (mainReadyTime > 0)
+                {
+                    cooldown.ReadyTime = mainReadyTime;
+                }
+                if (mainDuration > 0)
+                {
+                    cooldown.DurationSeconds = mainDuration;
+                }
             }
-            if (mainMaxCharges.HasValue)
+            else if (cooldown.ConcentrationCurrent == null)
             {
-                cooldown.MaxCharges = mainMaxCharges;
-            }
-            if (mainReadyTime > 0)
-            {
-                cooldown.ReadyTime = mainReadyTime;
-            }
-            if (mainDuration > 0)
-            {
-                cooldown.DurationSeconds = mainDuration;
+                // Fallback: the snapshot's recipeId is stale (addon updated to newer recipes).
+                // Concentration is a profession-wide pool shared by all recipes, so any CCM_DB
+                // entry for the same character+profession gives the correct current value.
+                var concKey = $"{cooldown.CharacterKey}\t{cooldown.Profession}";
+                if (concentrationFallbackByCharProf.TryGetValue(concKey, out var fallback) && fallback.Current != null)
+                {
+                    cooldown.ConcentrationCurrent = fallback.Current;
+                    cooldown.ConcentrationMaximum = fallback.Maximum;
+                    cooldown.ConcentrationScanTime = fallback.ScanTime;
+                }
             }
         }
 
