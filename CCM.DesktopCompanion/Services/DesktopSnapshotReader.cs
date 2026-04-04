@@ -479,10 +479,16 @@ internal sealed class DesktopSnapshotReader
             return;
         }
 
-        // Build lookup of existing snapshot entries
+        // Build lookup of existing snapshot entries, and which character keys already have
+        // at least one snapshot entry (used to gate injection of missing cooldowns below).
         var snapshotKeys = new HashSet<string>(StringComparer.Ordinal);
+        var snapshotCharacterKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var cooldown in snapshot.Cooldowns)
         {
+            if (!string.IsNullOrWhiteSpace(cooldown.CharacterKey))
+            {
+                snapshotCharacterKeys.Add(cooldown.CharacterKey);
+            }
             if (cooldown.RecipeId.HasValue && !string.IsNullOrWhiteSpace(cooldown.CharacterKey))
             {
                 snapshotKeys.Add($"{cooldown.CharacterKey}|{cooldown.RecipeId}");
@@ -571,10 +577,21 @@ internal sealed class DesktopSnapshotReader
             }
         }
 
-        // Add records from main cooldowns that are absent from the snapshot
+        // Add records from main cooldowns that are absent from the snapshot, but only for
+        // characters that already have at least one snapshot entry. Characters with zero snapshot
+        // entries have no tracked cooldown items and must be represented solely as concentration-only
+        // rows (via AddConcentrationOnlyRows), which bypass the item/expansion filters. Injecting
+        // normal cooldown rows for them would subject those rows to filters the user never had a
+        // chance to configure, causing the character to silently disappear from the grid.
         foreach (var (key, entry) in byKey)
         {
             if (snapshotKeys.Contains(key))
+            {
+                continue;
+            }
+
+            var charKey = entry.GetString("characterKey");
+            if (!snapshotCharacterKeys.Contains(charKey))
             {
                 continue;
             }
