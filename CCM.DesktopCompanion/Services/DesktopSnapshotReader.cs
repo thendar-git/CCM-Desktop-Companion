@@ -479,19 +479,34 @@ internal sealed class DesktopSnapshotReader
             return;
         }
 
-        // Build lookup of existing snapshot entries, and which character keys already have
-        // at least one snapshot entry (used to gate injection of missing cooldowns below).
+        // Build lookup of existing snapshot entries.
         var snapshotKeys = new HashSet<string>(StringComparer.Ordinal);
-        var snapshotCharacterKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var snapshotCooldownCharacterKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var cooldown in snapshot.Cooldowns)
         {
             if (!string.IsNullOrWhiteSpace(cooldown.CharacterKey))
             {
-                snapshotCharacterKeys.Add(cooldown.CharacterKey);
+                snapshotCooldownCharacterKeys.Add(cooldown.CharacterKey);
             }
             if (cooldown.RecipeId.HasValue && !string.IsNullOrWhiteSpace(cooldown.CharacterKey))
             {
                 snapshotKeys.Add($"{cooldown.CharacterKey}|{cooldown.RecipeId}");
+            }
+        }
+
+        // Characters present in snapshot.Characters but with zero cooldown entries are those the
+        // addon explicitly flagged as "no tracked recipes" (e.g. Death Knight Blacksmiths, Engineering
+        // alts with no cooldown items). They must never have CCM_DB.cooldowns entries injected as
+        // normal rows — that would subject them to item/expansion filters the user hasn't configured,
+        // making them silently disappear. They are handled solely as concentration-only rows.
+        // Characters absent from snapshot.Characters entirely have real tracked items in CCM_DB.cooldowns
+        // and should have those entries injected normally.
+        var concentrationOnlyCharacterKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var character in snapshot.Characters)
+        {
+            if (!string.IsNullOrWhiteSpace(character.CharacterKey) && !snapshotCooldownCharacterKeys.Contains(character.CharacterKey))
+            {
+                concentrationOnlyCharacterKeys.Add(character.CharacterKey);
             }
         }
 
@@ -577,12 +592,8 @@ internal sealed class DesktopSnapshotReader
             }
         }
 
-        // Add records from main cooldowns that are absent from the snapshot, but only for
-        // characters that already have at least one snapshot entry. Characters with zero snapshot
-        // entries have no tracked cooldown items and must be represented solely as concentration-only
-        // rows (via AddConcentrationOnlyRows), which bypass the item/expansion filters. Injecting
-        // normal cooldown rows for them would subject those rows to filters the user never had a
-        // chance to configure, causing the character to silently disappear from the grid.
+        // Add records from main cooldowns that are absent from the snapshot, skipping characters
+        // flagged as concentration-only (in snapshot.Characters but with no cooldown entries).
         foreach (var (key, entry) in byKey)
         {
             if (snapshotKeys.Contains(key))
@@ -591,7 +602,7 @@ internal sealed class DesktopSnapshotReader
             }
 
             var charKey = entry.GetString("characterKey");
-            if (!snapshotCharacterKeys.Contains(charKey))
+            if (concentrationOnlyCharacterKeys.Contains(charKey))
             {
                 continue;
             }
