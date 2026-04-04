@@ -126,15 +126,17 @@ internal sealed class DesktopSnapshotReader
         var nestedSnapshot = dbTable.GetTable("desktopSnapshot");
         if (nestedSnapshot != null)
         {
+            var dbCharactersTable = dbTable.GetTable("characters");
             snapshot = MapSnapshot(nestedSnapshot, filePath);
             // Enrich snapshot cooldowns with fresh charge and concentration data from CCM_DB.cooldowns
             EnrichFromMainCooldowns(snapshot, dbTable.GetTable("cooldowns"));
             // Enrich snapshot characters with classFile from CCM_DB.characters
-            EnrichCharactersFromDb(snapshot, dbTable.GetTable("characters"));
+            EnrichCharactersFromDb(snapshot, dbCharactersTable);
+            // Backfill concentration on any cooldown that still has none, using the dedicated
+            // per-profession concentration values now stored in CCM_DB.characters[key].concentration.
+            EnrichConcentrationFromCharacters(snapshot, dbCharactersTable);
             // Add concentration-only rows for character+profession combos with no cooldown entries.
-            // The addon generates these dynamically in-memory for its own UI but never writes them
-            // to CCM_DB, so the Desktop Companion must synthesize them from CCM_DB.characters.
-            AddConcentrationOnlyRows(snapshot, dbTable.GetTable("characters"), dbTable.GetTable("cooldowns"));
+            AddConcentrationOnlyRows(snapshot, dbCharactersTable, dbTable.GetTable("cooldowns"));
             return true;
         }
 
@@ -285,6 +287,71 @@ internal sealed class DesktopSnapshotReader
         return snapshot;
     }
 
+    private static void EnrichConcentrationFromCharacters(DesktopSnapshot snapshot, LuaTable? dbCharactersTable)
+    {
+        if (dbCharactersTable == null)
+        {
+            return;
+        }
+
+        // Build a lookup of concentration data from CCM_DB.characters[key].concentration[profession].
+        // This is the dedicated per-profession concentration store added to the addon — it covers
+        // characters whose profession has no tracked cooldown recipes and therefore no entry in
+        // CCM_DB.cooldowns to carry concentration as a sidecar.
+        var concByCharProf = BuildCharacterConcentrationLookup(dbCharactersTable);
+
+        foreach (var cooldown in snapshot.Cooldowns)
+        {
+            if (cooldown.ConcentrationCurrent != null || string.IsNullOrWhiteSpace(cooldown.CharacterKey))
+            {
+                continue;
+            }
+
+            var key = $"{cooldown.CharacterKey}\t{cooldown.Profession}";
+            if (concByCharProf.TryGetValue(key, out var conc))
+            {
+                cooldown.ConcentrationCurrent = conc.Current;
+                cooldown.ConcentrationMaximum = conc.Maximum;
+                cooldown.ConcentrationScanTime = conc.ScanTime;
+            }
+        }
+    }
+
+    private static Dictionary<string, (int? Current, int? Maximum, long? ScanTime)> BuildCharacterConcentrationLookup(LuaTable dbCharactersTable)
+    {
+        var result = new Dictionary<string, (int? Current, int? Maximum, long? ScanTime)>(StringComparer.Ordinal);
+        foreach (var pair in dbCharactersTable.Fields)
+        {
+            if (pair.Value is not LuaTable charEntry)
+            {
+                continue;
+            }
+
+            var concentrationTable = charEntry.GetTable("concentration");
+            if (concentrationTable == null)
+            {
+                continue;
+            }
+
+            foreach (var concPair in concentrationTable.Fields)
+            {
+                var profession = concPair.Key;
+                if (concPair.Value is not LuaTable concEntry || string.IsNullOrWhiteSpace(profession))
+                {
+                    continue;
+                }
+
+                var comboKey = $"{pair.Key}\t{profession}";
+                result[comboKey] = (
+                    concEntry.GetNullableInt("current"),
+                    concEntry.GetNullableInt("maximum"),
+                    concEntry.GetNullableLong("scanTime")
+                );
+            }
+        }
+        return result;
+    }
+
     private static void AddConcentrationOnlyRows(DesktopSnapshot snapshot, LuaTable? dbCharactersTable, LuaTable? dbCooldownsTable)
     {
         if (dbCharactersTable == null)
@@ -302,7 +369,12 @@ internal sealed class DesktopSnapshotReader
             }
         }
 
-        // Build a per-combo concentration lookup from CCM_DB.cooldowns (first entry wins).
+        // Primary concentration source: CCM_DB.characters[key].concentration[profession].
+        // This is the dedicated per-profession store that covers characters with no cooldown recipes.
+        var charConcLookup = BuildCharacterConcentrationLookup(dbCharactersTable);
+
+        // Secondary fallback: CCM_DB.cooldowns (first entry per char+profession, for older addon versions
+        // that did not yet write CCM_DB.characters.concentration).
         var concentrationByCombo = new Dictionary<string, (int? Current, int? Maximum, long? ScanTime)>(StringComparer.Ordinal);
         if (dbCooldownsTable != null)
         {
@@ -358,7 +430,11 @@ internal sealed class DesktopSnapshotReader
                     continue;
                 }
 
-                concentrationByCombo.TryGetValue(combo, out var conc);
+                charConcLookup.TryGetValue(combo, out var conc);
+                if (conc.Current == null)
+                {
+                    concentrationByCombo.TryGetValue(combo, out conc);
+                }
                 snapshot.Cooldowns.Add(new CooldownRecord
                 {
                     CharacterKey = characterKey,
